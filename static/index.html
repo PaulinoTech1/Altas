@@ -489,6 +489,19 @@
         </div>
         <div id="health-summary" class="investigation-grid"></div>
         <section class="panel">
+          <h3>Context evidence and retention</h3>
+          <label>Network context <select id="evidence-context"></select></label>
+          <button id="evidence-export" type="button">Download evidence bundle</button>
+          <p>Exports at most 100 observations per archive. Follow the archive's next_cursor through the API for older pages. Contracts and gap limits are recorded in the archive.</p>
+          <form id="retention-form">
+            <label>Delete observations and events older than (days) <input id="retention-days" type="number" min="1" max="3650" value="30" required></label>
+            <label><input id="retention-confirm" type="checkbox" required> Delete the selected context's old evidence. Keep identity snapshots.</label>
+            <button type="submit">Purge old evidence</button>
+          </form>
+          <pre id="retention-result" role="status"></pre>
+        </section>
+        <section class="panel"><h3>Recorded observation gaps</h3><p>Restarts, scheduling delays or clock discontinuities; no cause is proven. Latest 30 gaps across contexts; use the paginated gaps API for history.</p><pre id="health-gaps"></pre></section>
+        <section class="panel">
           <h3>Recent collection runs</h3>
           <div class="table-wrap">
             <table>

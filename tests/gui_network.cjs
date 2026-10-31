@@ -106,6 +106,7 @@ async function until(check) {
   });
   const w = dom.window,
     d = w.document;
+  await until(() => w.AtlasAPI);
   d.querySelector("#control-token").value="1".repeat(64);
   d.querySelector("#control-unlock").dispatchEvent(new w.Event("submit",{cancelable:true}));
   await until(() => d.querySelector('[data-node="ip:1"]'));

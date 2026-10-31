@@ -10,6 +10,7 @@ use std::{
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+mod bundle;
 mod captures;
 mod evidence;
 mod retention;
@@ -312,7 +313,20 @@ pub fn dispatch(r: &Value) -> Result<Value> {
             Ok(result)
         }
         "detail" => detail(&c, r),
+        "evidence_bundle" => bundle::export(&mut c, r),
         "purge" => retention::purge(&mut c, r),
+        "gaps" => {
+            let active = active_network(&c)?;
+            let scope = r["network_id"].as_str().unwrap_or(&active);
+            let cursor = number(r, "cursor", i64::MAX);
+            let limit = number(r, "limit", 100);
+            let mut records=rows(&c,"SELECT * FROM collection_gaps WHERE network_id=? AND id<? ORDER BY id DESC LIMIT ?",&[&scope,&cursor,&(limit+1)])?;
+            let more = records.len() > limit as usize;
+            records.truncate(limit as usize);
+            Ok(
+                json!({"gaps":records,"next_cursor":if more{records.last().map(|r|r["id"].clone())}else{None},"limit":limit}),
+            )
+        }
         "collection_contract" => evidence::contract(&c, number(r, "id", 0)),
         "health" => health(&c),
         "report" => report(&c, r),

@@ -25,6 +25,8 @@ READS = frozenset(
         "detail",
         "health",
         "collection_contract",
+        "evidence_bundle",
+        "gaps",
         "alerts",
         "sensors",
         "source",
