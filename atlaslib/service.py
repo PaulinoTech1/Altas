@@ -20,6 +20,7 @@ from .errors import AtlasError, log_failure
 from .storage import Store
 from .networks import Networks
 from .observer import Observer
+from .evidence import begin_batch, DISCOVERY_PORTS
 from . import collectors
 
 
@@ -68,10 +69,10 @@ class Atlas:
     def db(self):
         return self.store.connection()
 
-    def metric(self, kind, started, clock, items, error=None):
+    def metric(self, kind, started, clock, items, error=None, batch_id=None):
         with self.db() as connection:
             connection.execute(
-                "INSERT INTO collection_runs(kind,started_at,finished_at,duration_ms,items,error) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO collection_runs(kind,started_at,finished_at,duration_ms,items,error,batch_id) VALUES(?,?,?,?,?,?,?)",
                 (
                     kind,
                     started,
@@ -79,6 +80,7 @@ class Atlas:
                     round((time.monotonic() - clock) * 1000),
                     items,
                     error,
+                    batch_id,
                 ),
             )
         try:
@@ -90,9 +92,9 @@ class Atlas:
             self.investigation_error = failure.message
             self.investigation_failure = failure.failure()
 
-    def finish_run(self, kind, started, clock, items, error=None):
+    def finish_run(self, kind, started, clock, items, error=None, batch_id=None):
         try:
-            self.metric(kind, started, clock, items, error)
+            self.metric(kind, started, clock, items, error, batch_id=batch_id)
             self.metrics_failure = None
         except Exception as failure:
             self.metrics_failure = log_failure(
@@ -282,7 +284,7 @@ class Atlas:
             ).fetchone()
         return dict(at=row["at"], **json.loads(row["data"])) if row else None
 
-    def save_identity(self, host, data, network_id=None):
+    def save_identity(self, host, data, network_id=None, batch_id=None):
         network_id = self.network.id if network_id is None else network_id
         with self.db() as c:
             c.execute("BEGIN IMMEDIATE")
@@ -294,8 +296,8 @@ class Atlas:
             ):
                 return False
             c.execute(
-                "INSERT OR REPLACE INTO identities(host,data,at,network_id) VALUES(?,?,?,?)",
-                (host, json.dumps(data), now(), network_id),
+                "INSERT OR REPLACE INTO identities(host,data,at,network_id,batch_id) VALUES(?,?,?,?,?)",
+                (host, json.dumps(data), now(), network_id, batch_id),
             )
 
     def start_enrichment(self):
@@ -318,7 +320,9 @@ class Atlas:
     def enrich(self):
         context = self.network.id
         started, clock = (now(), time.monotonic())
+        batch_id = None
         try:
+            batch_id = begin_batch(self, "enrichment", context)
             wifi_cmd = shutil.which("termux-wifi-connectioninfo")
             if wifi_cmd:
                 try:
@@ -415,7 +419,7 @@ class Atlas:
                                 identity["description_failure"] = failure.failure()
                         if not self.network.is_current(context):
                             break
-                        self.save_identity(host, identity, context)
+                        self.save_identity(host, identity, context, batch_id=batch_id)
                         try:
                             self.add(host, host, DEFAULT_PORTS, network_id=context)
                         except (ValueError, sqlite3.IntegrityError):
@@ -451,7 +455,7 @@ class Atlas:
                         "Reverse DNS unavailable or timed out"
                     )
                 if self.network.is_current(context):
-                    self.save_identity(host, identity, context)
+                    self.save_identity(host, identity, context, batch_id=batch_id)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                 list(pool.map(resolve, hosts))
@@ -469,6 +473,7 @@ class Atlas:
                     clock,
                     len(self.enrichment["ssdp"]),
                     self.enrichment["error"],
+                    batch_id=batch_id,
                 )
             finally:
                 self.enrichment["running"] = False
@@ -491,9 +496,7 @@ class Atlas:
     def discover_host(self, host):
         context = self.discovery.get("network_id", self.network.id)
         opened, refused = ([], False)
-        ports = sorted(
-            set(DEFAULT_PORTS + [139, 445, 554, 631, 5000, 7000, 8008, 8009, 9100])
-        )
+        ports = DISCOVERY_PORTS
         for port in ports:
             if not self.network.is_current(context):
                 return None
@@ -556,7 +559,9 @@ class Atlas:
             return self.discover_host(host)
 
         started, clock = (now(), time.monotonic())
+        batch_id = None
         try:
+            batch_id = begin_batch(self, "discovery", context)
             with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
                 futures = [pool.submit(current_probe, host) for host in hosts]
                 for future in concurrent.futures.as_completed(futures):
@@ -596,6 +601,7 @@ class Atlas:
                     clock,
                     self.discovery["checked"],
                     self.discovery["error"],
+                    batch_id=batch_id,
                 )
             finally:
                 self.discovery["finished_at"] = now()
@@ -636,7 +642,7 @@ class Atlas:
             ),
         }
 
-    def record(self, target_id, data, network_id=None):
+    def record(self, target_id, data, network_id=None, batch_id=None):
         at = now()
         with self.db() as c:
             if network_id is not None:
@@ -689,12 +695,12 @@ class Atlas:
                                         f"TCP {s['port']}: {field.replace('_', ' ')} changed"
                                     )
             c.execute(
-                "INSERT INTO observations(target_id,at,data) VALUES(?,?,?)",
-                (target_id, at, json.dumps(data)),
+                "INSERT INTO observations(target_id,at,data,batch_id) VALUES(?,?,?,?)",
+                (target_id, at, json.dumps(data), batch_id),
             )
             c.executemany(
-                "INSERT INTO events(target_id,at,message) VALUES(?,?,?)",
-                [(target_id, at, m) for m in messages],
+                "INSERT INTO events(target_id,at,message,batch_id) VALUES(?,?,?,?)",
+                [(target_id, at, m, batch_id) for m in messages],
             )
 
     def scan(self):
@@ -706,11 +712,14 @@ class Atlas:
     def _scan_locked(self):
         context = self.network.id
         started, clock, completed = (now(), time.monotonic(), 0)
+        batch_id = None
         try:
             with self.db() as connection:
                 targets = connection.execute(
                     "SELECT * FROM targets WHERE paused=0 AND network_id=?", (context,)
                 ).fetchall()
+
+            batch_id = begin_batch(self, "tcp", context, targets)
 
             def current_scan(target):
                 return (
@@ -723,7 +732,12 @@ class Atlas:
                 for target, data in zip(targets, pool.map(current_scan, targets)):
                     if not self.network.is_current(context):
                         break
-                    if self.record(target["id"], data, network_id=context) is False:
+                    if (
+                        self.record(
+                            target["id"], data, network_id=context, batch_id=batch_id
+                        )
+                        is False
+                    ):
                         break
                     completed += 1
             self.last_error = None
@@ -737,7 +751,12 @@ class Atlas:
         finally:
             try:
                 self.finish_run(
-                    "TCP observation", started, clock, completed, self.last_error
+                    "TCP observation",
+                    started,
+                    clock,
+                    completed,
+                    self.last_error,
+                    batch_id=batch_id,
                 )
             finally:
                 self.scanning = False

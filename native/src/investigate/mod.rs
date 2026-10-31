@@ -11,6 +11,7 @@ use std::{
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 mod captures;
+mod evidence;
 use captures::{compare, import, packets, replay, sessions};
 mod alerts;
 use alerts::{alert, detail, snapshot, sync};
@@ -102,6 +103,7 @@ fn init(c: &mut Connection) -> Result<()> {
             ))?;
         }
     }
+    evidence::initialize(c)?;
     let migrated: bool = c.query_row(
         "SELECT EXISTS(SELECT 1 FROM investigation_state WHERE key='legacy_migrated')",
         [],
@@ -309,6 +311,7 @@ pub fn dispatch(r: &Value) -> Result<Value> {
             Ok(result)
         }
         "detail" => detail(&c, r),
+        "collection_contract" => evidence::contract(&c, number(r, "id", 0)),
         "health" => health(&c),
         "report" => report(&c, r),
         "source" => {

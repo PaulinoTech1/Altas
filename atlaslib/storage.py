@@ -93,3 +93,8 @@ class Store:
                 c.execute(
                     "INSERT OR IGNORE INTO network_contexts(id,label,created_at,connected) VALUES('legacy','Earlier observations (network unknown)',strftime('%Y-%m-%dT%H:%M:%fZ','now'),0)"
                 )
+
+            for table in ("observations", "events", "identities", "collection_runs"):
+                columns = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+                if "batch_id" not in columns:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN batch_id INTEGER")

@@ -50,7 +50,7 @@ pub(super) fn analyze(c: &Connection, r: &Value) -> Result<Value> {
         |r| r.get(0),
     )?;
     // First bound observations by target/id, then extract just the selected service.
-    let mut records=rows(c,"SELECT id,at,json_extract(data,'$.services') AS services FROM observations WHERE target_id=? AND id<=? ORDER BY id DESC LIMIT 10000",&[&id,&through])?;
+    let mut records=rows(c,"SELECT id,at,batch_id,json_extract(data,'$.services') AS services FROM observations WHERE target_id=? AND id<=? ORDER BY id DESC LIMIT 10000",&[&id,&through])?;
     records.reverse();
     let mut samples = Vec::new();
     let mut times = Vec::new();
@@ -121,10 +121,20 @@ pub(super) fn analyze(c: &Connection, r: &Value) -> Result<Value> {
     if total > 10000 {
         quality.push("Only the latest 10,000 observations are considered");
     }
+    let mut contracts = Vec::new();
+    let batches: BTreeSet<i64> = records
+        .iter()
+        .filter_map(|r| r["batch_id"].as_i64())
+        .collect();
+    let contract_count = batches.len();
+    let batch_ids: Vec<_> = batches.iter().copied().collect();
+    for batch in batches.into_iter().take(100) {
+        contracts.push(evidence::contract(c, batch)?);
+    }
     let stride = n.div_ceil(500).max(1);
     let plot:Vec<_>=samples.iter().zip(&times).enumerate().step_by(stride).map(|(i,(&v,&t))|json!({"sample_index":i,"observation_id":ids[i],"elapsed_ms":t,"latency_ms":v as f64/10.0})).collect();
     Ok(
-        json!({"method_version":"atlas-research/1","dataset":"network","build":kernels::manifest(),"backend":kernels::BACKEND,"target":target.remove(0),"port":port,"settings":{"window_samples":window,"threshold_ms":threshold,"quantile":"nearest rank","latency_quantization_ms":0.1,"range_ms":[0,3276.7],"variance":"sample variance (n-1), exact i128 numerator"},"provenance":{"evidence_sha256":hash(&serde_json::to_string(&records)?),"total_target_observations":total,"loaded_observations":records.len(),"through_observation_id":records.last().map(|r|r["id"].clone()),"first_included_observation_id":ids.first(),"last_included_observation_id":ids.last()},"signal":{"samples":n,"mean_ms":mean,"sample_stddev_ms":variance.map(|v|v.sqrt()/10.0),"min_ms":if n>0{Some(m.min as f64/10.0)}else{None},"max_ms":if n>0{Some(m.max as f64/10.0)}else{None},"median_ms":percentile(&sorted,0.5),"p95_ms":percentile(&sorted,0.95),"mean_absolute_successive_change_ms":if n>1{Some(m.absolute_delta as f64/(n-1)as f64/10.0)}else{None}},"missing_selected_service_or_latency":missing,"excluded_samples":skipped,"candidate_timing_shifts":shifts,"plot":plot,"quality":quality,"interpretation":["TCP connect timing is not radio signal strength, throughput, one-way latency or physical distance","Only successful connections with recorded timing are analyzed; this selection excludes failed attempts","Changes may reflect phone scheduling, device load, routing, power state or measurement noise","Exploratory threshold candidates do not establish statistical significance or causation","Recorded timestamps and 0.1 ms quantization limit temporal precision"]}),
+        json!({"method_version":"atlas-research/1","dataset":"network","collection_contracts":contracts,"batch_ids":batch_ids,"contracts_truncated":contract_count>100,"legacy_contracts_unknown":records.iter().any(|r|r["batch_id"].is_null()),"build":kernels::manifest(),"backend":kernels::BACKEND,"target":target.remove(0),"port":port,"settings":{"window_samples":window,"threshold_ms":threshold,"quantile":"nearest rank","latency_quantization_ms":0.1,"range_ms":[0,3276.7],"variance":"sample variance (n-1), exact i128 numerator"},"provenance":{"evidence_sha256":hash(&serde_json::to_string(&records)?),"total_target_observations":total,"loaded_observations":records.len(),"through_observation_id":records.last().map(|r|r["id"].clone()),"first_included_observation_id":ids.first(),"last_included_observation_id":ids.last()},"signal":{"samples":n,"mean_ms":mean,"sample_stddev_ms":variance.map(|v|v.sqrt()/10.0),"min_ms":if n>0{Some(m.min as f64/10.0)}else{None},"max_ms":if n>0{Some(m.max as f64/10.0)}else{None},"median_ms":percentile(&sorted,0.5),"p95_ms":percentile(&sorted,0.95),"mean_absolute_successive_change_ms":if n>1{Some(m.absolute_delta as f64/(n-1)as f64/10.0)}else{None}},"missing_selected_service_or_latency":missing,"excluded_samples":skipped,"candidate_timing_shifts":shifts,"plot":plot,"quality":quality,"interpretation":["TCP connect timing is not radio signal strength, throughput, one-way latency or physical distance","Only successful connections with recorded timing are analyzed; this selection excludes failed attempts","Changes may reflect phone scheduling, device load, routing, power state or measurement noise","Exploratory threshold candidates do not establish statistical significance or causation","Recorded timestamps and 0.1 ms quantization limit temporal precision"]}),
     )
 }
 pub(super) fn report(c: &Connection, r: &Value) -> Result<Value> {
