@@ -12,6 +12,7 @@ use std::{
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 mod captures;
 mod evidence;
+mod retention;
 use captures::{compare, import, packets, replay, sessions};
 mod alerts;
 use alerts::{alert, detail, snapshot, sync};
@@ -311,6 +312,7 @@ pub fn dispatch(r: &Value) -> Result<Value> {
             Ok(result)
         }
         "detail" => detail(&c, r),
+        "purge" => retention::purge(&mut c, r),
         "collection_contract" => evidence::contract(&c, number(r, "id", 0)),
         "health" => health(&c),
         "report" => report(&c, r),

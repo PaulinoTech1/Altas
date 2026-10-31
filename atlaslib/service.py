@@ -645,8 +645,8 @@ class Atlas:
     def record(self, target_id, data, network_id=None, batch_id=None):
         at = now()
         with self.db() as c:
+            c.execute("BEGIN IMMEDIATE")
             if network_id is not None:
-                c.execute("BEGIN IMMEDIATE")
                 if (
                     c.execute(
                         "SELECT active_id FROM network_state WHERE id=1"
@@ -695,11 +695,11 @@ class Atlas:
                                         f"TCP {s['port']}: {field.replace('_', ' ')} changed"
                                     )
             c.execute(
-                "INSERT INTO observations(target_id,at,data,batch_id) VALUES(?,?,?,?)",
+                "INSERT INTO observations(id,target_id,at,data,batch_id) SELECT (SELECT value+1 FROM evidence_sequences WHERE name='observations'),?,?,?,?",
                 (target_id, at, json.dumps(data), batch_id),
             )
             c.executemany(
-                "INSERT INTO events(target_id,at,message,batch_id) VALUES(?,?,?,?)",
+                "INSERT INTO events(id,target_id,at,message,batch_id) SELECT (SELECT value+1 FROM evidence_sequences WHERE name='events'),?,?,?,?",
                 [(target_id, at, m, batch_id) for m in messages],
             )
 

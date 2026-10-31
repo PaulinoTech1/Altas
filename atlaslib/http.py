@@ -40,6 +40,7 @@ WRITES = frozenset(
         "sensor_revoke",
         "ingest",
         "research_benchmark",
+        "purge",
     )
 )
 ASSETS = {
@@ -63,6 +64,7 @@ INTEGER_FIELDS = (
     "port",
     "threshold_ms",
     "through_id",
+    "age_seconds",
 )
 
 
