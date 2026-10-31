@@ -618,6 +618,8 @@
       h.runtime.investigation_failure,
       h.runtime.discovery.failure,
       h.runtime.enrichment.failure,
+      h.runtime.observer && h.runtime.observer.status_failure,
+      h.runtime.wifi_context_failure,
     ].filter(Boolean);
     if (failures.length)
       $("#health-summary").innerHTML +=
@@ -630,6 +632,13 @@
             .join("\n\n"),
         ) +
         "</pre></article>";
+    const source = await v2("research_sources");
+    const contextSelect = $("#evidence-context"), selectedContext = contextSelect.value;
+    contextSelect.innerHTML = source.contexts.map(context => `<option value="${esc(context.id)}">${esc(context.label)}</option>`).join("");
+    contextSelect.value = source.contexts.some(context => context.id === selectedContext) ? selectedContext : source.active_network_id;
+    $("#health-gaps").textContent = JSON.stringify(h.gaps || [], null, 2);
+    const observer = h.runtime.observer;
+    if (observer) $("#health-summary").innerHTML += `<article class="panel"><h3>Observation freshness</h3><p>Last successful run: ${esc(observer.last_successful_collection || "none")}<br>Wall clock: ${esc(observer.wall_clock_at)}<br>Age: ${esc(observer.seconds_since_success === null ? "unknown" : Math.round(observer.seconds_since_success) + " seconds")} · ${observer.overdue ? "overdue" : "within interval or unknown"}</p><p>Android may suspend Termux. Successful run completion does not mean a device responded.</p></article>`;
     $("#health-runs").innerHTML =
       h.runs
         .map(
@@ -639,6 +648,21 @@
         .join("") ||
       '<tr><td colspan="5">No collection runs recorded since this update.</td></tr>';
   }
+  $("#evidence-export").onclick = safe(async () => {
+    const result = await v2("evidence_bundle", {network_id:$("#evidence-context").value});
+    download(JSON.stringify(result, null, 2), result.filename, "application/json");
+  });
+  $("#retention-form").onsubmit = event => {
+    event.preventDefault();
+    safe(async () => {
+      if (!$("#retention-confirm").checked) return;
+      const days = Number($("#retention-days").value);
+      const result = await window.AtlasAPI.request("/api/v2/purge", {network_id:$("#evidence-context").value,age_seconds:days*86400});
+      $("#retention-result").textContent = JSON.stringify(result, null, 2);
+      $("#retention-confirm").checked = false;
+      await loadHealth();
+    })();
+  };
   $("#health-refresh").onclick = safe(loadHealth);
   $("#inventory-report").onclick = safe(() => report({}));
   document.addEventListener("visibilitychange", () => {

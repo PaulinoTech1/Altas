@@ -45,10 +45,10 @@ class Tests(unittest.TestCase):
         threading.Thread(target=server.serve_forever,daemon=True).start()
         conn=http.client.HTTPConnection('127.0.0.1',server.server_address[1])
         try:
-            conn.request('POST','/api/targets',json.dumps({'host':'127.0.0.1','ports':[80]}),{'Content-Type':'application/json'})
+            conn.request('POST','/api/targets',json.dumps({'host':'127.0.0.1','ports':[80]}),{'Content-Type':'application/json','X-Atlas-Control':self.app.control_token})
             r=conn.getresponse();self.assertEqual(r.status,201);r.read()
-            conn.request('GET','/api/state');r=conn.getresponse();self.assertEqual(len(json.loads(r.read())['targets']),1)
-            conn.request('POST','/api/scan','{}',{'Content-Type':'application/json','Origin':'http://foreign.example'})
+            conn.request('GET','/api/state',headers={'X-Atlas-Control':self.app.control_token});r=conn.getresponse();self.assertEqual(len(json.loads(r.read())['targets']),1)
+            conn.request('POST','/api/scan','{}',{'Content-Type':'application/json','Origin':'http://foreign.example','X-Atlas-Control':self.app.control_token})
             r=conn.getresponse();self.assertEqual(r.status,403);r.read()
             conn.request('GET','/');r=conn.getresponse();self.assertIn(b'Know what changed',r.read())
         finally: conn.close();server.shutdown();server.server_close()

@@ -7,6 +7,8 @@ import errno
 import http.client
 import ipaddress
 import json
+import os
+import secrets
 import re
 import socket
 import sqlite3
@@ -19,6 +21,9 @@ from .config import DEFAULT_PORTS
 from .errors import AtlasError, log_failure
 from .storage import Store
 from .networks import Networks
+from .observer import Observer
+from .wifi_context import read_context
+from .evidence import begin_batch, DISCOVERY_PORTS, freeze_collector
 from . import collectors
 
 
@@ -29,6 +34,12 @@ def now():
 class Atlas:
 
     def __init__(self, database, interval=300, timeout=1.5, discovery_interval=300):
+        configured = os.environ.get("ATLAS_CONTROL_TOKEN")
+        if configured is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", configured):
+            raise AtlasError("ATLAS_CONTROL_TOKEN_INVALID")
+        self.control_token = (
+            configured if configured is not None else secrets.token_hex(32)
+        )
         self.database, self.interval, self.timeout = (str(database), interval, timeout)
         self.lock = threading.Lock()
         self.discovery_lock = threading.Lock()
@@ -54,9 +65,15 @@ class Atlas:
         self.started_at = now()
         self.investigation_error = None
         self.stop = threading.Event()
+        freeze_collector(self)
         self.store = Store(self.database)
         self.store.initialize()
         self.network = Networks(self.store)
+        self.observer = Observer(self.store, self.interval, self.network)
+        self.wifi_context_failure = None
+        self.wifi_context_path = os.environ.get(
+            "ATLAS_WIFI_CONTEXT_FILE", self.database + ".wifi-context.json"
+        )
         self.network_tracking = False
         self.network_pending = False
         self.network_failure = None
@@ -66,10 +83,10 @@ class Atlas:
     def db(self):
         return self.store.connection()
 
-    def metric(self, kind, started, clock, items, error=None):
+    def metric(self, kind, started, clock, items, error=None, batch_id=None):
         with self.db() as connection:
             connection.execute(
-                "INSERT INTO collection_runs(kind,started_at,finished_at,duration_ms,items,error) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO collection_runs(kind,started_at,finished_at,duration_ms,items,error,batch_id) VALUES(?,?,?,?,?,?,?)",
                 (
                     kind,
                     started,
@@ -77,6 +94,7 @@ class Atlas:
                     round((time.monotonic() - clock) * 1000),
                     items,
                     error,
+                    batch_id,
                 ),
             )
         try:
@@ -88,14 +106,22 @@ class Atlas:
             self.investigation_error = failure.message
             self.investigation_failure = failure.failure()
 
-    def finish_run(self, kind, started, clock, items, error=None):
+    def finish_run(self, kind, started, clock, items, error=None, batch_id=None):
         try:
-            self.metric(kind, started, clock, items, error)
+            self.metric(kind, started, clock, items, error, batch_id=batch_id)
             self.metrics_failure = None
         except Exception as failure:
             self.metrics_failure = log_failure(
                 failure, operation="collector_metrics"
             ).failure()
+
+        finally:
+            try:
+                self.observer.completed(error is None and self.metrics_failure is None)
+            except Exception as failure:
+                self.observer.failure = log_failure(
+                    failure, operation="observer_checkpoint"
+                ).failure()
 
     def refresh_network(self, auto_discover=True, force=False):
         wifi = self.wifi_network()
@@ -131,6 +157,7 @@ class Atlas:
         self.network_tracking = True
         while not self.stop.is_set():
             try:
+                self.observer.tick()
                 self.refresh_network()
             except Exception as error:
                 self.network_failure = log_failure(
@@ -157,10 +184,12 @@ class Atlas:
             network=self.network.snapshot(),
             network_pending=self.network_pending,
             network_failure=self.network_failure,
+            wifi_context_failure=self.wifi_context_failure,
             discovery_interval=self.discovery_interval,
             next_discovery_in_seconds=max(
                 0, round(self.discovery_next_due - time.monotonic())
             ),
+            observer=self.observer.snapshot(),
             started_at=self.started_at,
             scanning=self.scanning,
             discovery=self.discovery.copy(),
@@ -275,7 +304,7 @@ class Atlas:
             ).fetchone()
         return dict(at=row["at"], **json.loads(row["data"])) if row else None
 
-    def save_identity(self, host, data, network_id=None):
+    def save_identity(self, host, data, network_id=None, batch_id=None):
         network_id = self.network.id if network_id is None else network_id
         with self.db() as c:
             c.execute("BEGIN IMMEDIATE")
@@ -287,8 +316,8 @@ class Atlas:
             ):
                 return False
             c.execute(
-                "INSERT OR REPLACE INTO identities(host,data,at,network_id) VALUES(?,?,?,?)",
-                (host, json.dumps(data), now(), network_id),
+                "INSERT OR REPLACE INTO identities(host,data,at,network_id,batch_id) VALUES(?,?,?,?,?)",
+                (host, json.dumps(data), now(), network_id, batch_id),
             )
 
     def start_enrichment(self):
@@ -311,7 +340,9 @@ class Atlas:
     def enrich(self):
         context = self.network.id
         started, clock = (now(), time.monotonic())
+        batch_id = None
         try:
+            batch_id = begin_batch(self, "enrichment", context)
             wifi_cmd = shutil.which("termux-wifi-connectioninfo")
             if wifi_cmd:
                 try:
@@ -408,7 +439,7 @@ class Atlas:
                                 identity["description_failure"] = failure.failure()
                         if not self.network.is_current(context):
                             break
-                        self.save_identity(host, identity, context)
+                        self.save_identity(host, identity, context, batch_id=batch_id)
                         try:
                             self.add(host, host, DEFAULT_PORTS, network_id=context)
                         except (ValueError, sqlite3.IntegrityError):
@@ -444,7 +475,7 @@ class Atlas:
                         "Reverse DNS unavailable or timed out"
                     )
                 if self.network.is_current(context):
-                    self.save_identity(host, identity, context)
+                    self.save_identity(host, identity, context, batch_id=batch_id)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                 list(pool.map(resolve, hosts))
@@ -462,6 +493,7 @@ class Atlas:
                     clock,
                     len(self.enrichment["ssdp"]),
                     self.enrichment["error"],
+                    batch_id=batch_id,
                 )
             finally:
                 self.enrichment["running"] = False
@@ -484,9 +516,7 @@ class Atlas:
     def discover_host(self, host):
         context = self.discovery.get("network_id", self.network.id)
         opened, refused = ([], False)
-        ports = sorted(
-            set(DEFAULT_PORTS + [139, 445, 554, 631, 5000, 7000, 8008, 8009, 9100])
-        )
+        ports = DISCOVERY_PORTS
         for port in ports:
             if not self.network.is_current(context):
                 return None
@@ -549,13 +579,18 @@ class Atlas:
             return self.discover_host(host)
 
         started, clock = (now(), time.monotonic())
+        batch_id = None
         try:
+            batch_id = begin_batch(self, "discovery", context)
             with concurrent.futures.ThreadPoolExecutor(max_workers=32) as pool:
                 futures = [pool.submit(current_probe, host) for host in hosts]
                 for future in concurrent.futures.as_completed(futures):
                     result = future.result()
                     if not self.network.is_current(context):
                         self.discovery["cancelled"] = True
+                        self.discovery["error"] = AtlasError(
+                            "ATLAS_NETWORK_CHANGED"
+                        ).message
                         for pending in futures:
                             pending.cancel()
                         break
@@ -589,6 +624,7 @@ class Atlas:
                     clock,
                     self.discovery["checked"],
                     self.discovery["error"],
+                    batch_id=batch_id,
                 )
             finally:
                 self.discovery["finished_at"] = now()
@@ -629,11 +665,11 @@ class Atlas:
             ),
         }
 
-    def record(self, target_id, data, network_id=None):
+    def record(self, target_id, data, network_id=None, batch_id=None):
         at = now()
         with self.db() as c:
+            c.execute("BEGIN IMMEDIATE")
             if network_id is not None:
-                c.execute("BEGIN IMMEDIATE")
                 if (
                     c.execute(
                         "SELECT active_id FROM network_state WHERE id=1"
@@ -682,12 +718,12 @@ class Atlas:
                                         f"TCP {s['port']}: {field.replace('_', ' ')} changed"
                                     )
             c.execute(
-                "INSERT INTO observations(target_id,at,data) VALUES(?,?,?)",
-                (target_id, at, json.dumps(data)),
+                "INSERT INTO observations(id,target_id,at,data,batch_id) SELECT (SELECT value+1 FROM evidence_sequences WHERE name='observations'),?,?,?,?",
+                (target_id, at, json.dumps(data), batch_id),
             )
             c.executemany(
-                "INSERT INTO events(target_id,at,message) VALUES(?,?,?)",
-                [(target_id, at, m) for m in messages],
+                "INSERT INTO events(id,target_id,at,message,batch_id) SELECT (SELECT value+1 FROM evidence_sequences WHERE name='events'),?,?,?,?",
+                [(target_id, at, m, batch_id) for m in messages],
             )
 
     def scan(self):
@@ -699,11 +735,14 @@ class Atlas:
     def _scan_locked(self):
         context = self.network.id
         started, clock, completed = (now(), time.monotonic(), 0)
+        batch_id = None
         try:
             with self.db() as connection:
                 targets = connection.execute(
                     "SELECT * FROM targets WHERE paused=0 AND network_id=?", (context,)
                 ).fetchall()
+
+            batch_id = begin_batch(self, "tcp", context, targets)
 
             def current_scan(target):
                 return (
@@ -715,9 +754,14 @@ class Atlas:
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                 for target, data in zip(targets, pool.map(current_scan, targets)):
                     if not self.network.is_current(context):
-                        break
-                    if self.record(target["id"], data, network_id=context) is False:
-                        break
+                        raise AtlasError("ATLAS_NETWORK_CHANGED")
+                    if (
+                        self.record(
+                            target["id"], data, network_id=context, batch_id=batch_id
+                        )
+                        is False
+                    ):
+                        raise AtlasError("ATLAS_NETWORK_CHANGED")
                     completed += 1
             self.last_error = None
             self.last_failure = None
@@ -730,7 +774,12 @@ class Atlas:
         finally:
             try:
                 self.finish_run(
-                    "TCP observation", started, clock, completed, self.last_error
+                    "TCP observation",
+                    started,
+                    clock,
+                    completed,
+                    self.last_error,
+                    batch_id=batch_id,
                 )
             finally:
                 self.scanning = False
@@ -802,7 +851,11 @@ class Atlas:
         )
 
     def wifi_network(self):
-        return collectors.wifi_network()
+        visible = collectors.wifi_network()
+        result, self.wifi_context_failure = read_context(
+            self.wifi_context_path, visible, time.time()
+        )
+        return result
 
     def device_description(self, host, location):
         return collectors.device_description(host, location)

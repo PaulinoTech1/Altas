@@ -1,6 +1,7 @@
 """SQLite lifecycle and backward-compatible schema initialization."""
 
 import sqlite3
+from .config import ROOT
 from contextlib import contextmanager
 
 TARGETS = """CREATE TABLE targets(id INTEGER PRIMARY KEY,host TEXT NOT NULL,label TEXT NOT NULL,
@@ -43,6 +44,7 @@ class Store:
             """
                 + NETWORK_SCHEMA
             )
+            c.executescript((ROOT / "evidence_schema.sql").read_text())
             c.execute("BEGIN IMMEDIATE")
             for table, definition in [("targets", TARGETS), ("identities", IDENTITIES)]:
                 if not c.execute(
@@ -91,3 +93,14 @@ class Store:
                 c.execute(
                     "INSERT OR IGNORE INTO network_contexts(id,label,created_at,connected) VALUES('legacy','Earlier observations (network unknown)',strftime('%Y-%m-%dT%H:%M:%fZ','now'),0)"
                 )
+
+            if "visible_evidence" not in {
+                r["name"] for r in c.execute("PRAGMA table_info(network_contexts)")
+            }:
+                c.execute(
+                    "ALTER TABLE network_contexts ADD COLUMN visible_evidence TEXT"
+                )
+            for table in ("observations", "events", "identities", "collection_runs"):
+                columns = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+                if "batch_id" not in columns:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN batch_id INTEGER")

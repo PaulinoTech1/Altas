@@ -122,7 +122,8 @@ class HttpFailureTests(unittest.TestCase):
         self.logs.__exit__(None, None, None)
 
     def request(self, method, path, body=None, headers=None):
-        self.conn.request(method, path, body, headers or {})
+        headers = {"X-Atlas-Control": self.app.control_token, **(headers or {})}
+        self.conn.request(method, path, body, headers)
         r = self.conn.getresponse()
         return r.status, dict(r.getheaders()), json.loads(r.read())
 

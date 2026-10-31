@@ -149,7 +149,26 @@ pub fn window_sums(x: &[i16], w: usize) -> Vec<i64> {
 pub fn manifest() -> serde_json::Value {
     use sha2::{Digest, Sha256};
     let mut digest = Sha256::new();
+    let mut sources = serde_json::Map::new();
     for (name, bytes) in [
+        (
+            "reports.rs",
+            include_bytes!("investigate/reports.rs").as_slice(),
+        ),
+        (
+            "failure_codes.json",
+            include_bytes!("../../failure_codes.json").as_slice(),
+        ),
+        (
+            "evidence_schema.sql",
+            include_bytes!("../../evidence_schema.sql").as_slice(),
+        ),
+        (
+            "evidence.rs",
+            include_bytes!("investigate/evidence.rs").as_slice(),
+        ),
+        ("mod.rs", include_bytes!("investigate/mod.rs").as_slice()),
+        ("capture.rs", include_bytes!("capture.rs").as_slice()),
         ("research.S", include_bytes!("research.S").as_slice()),
         ("kernels.rs", include_bytes!("kernels.rs").as_slice()),
         (
@@ -161,12 +180,16 @@ pub fn manifest() -> serde_json::Value {
             include_bytes!("investigate/research_network.rs").as_slice(),
         ),
     ] {
+        sources.insert(
+            name.to_string(),
+            serde_json::json!(format!("{:x}", Sha256::digest(bytes))),
+        );
         digest.update((name.len() as u64).to_be_bytes());
         digest.update(name.as_bytes());
         digest.update((bytes.len() as u64).to_be_bytes());
         digest.update(bytes);
     }
-    serde_json::json!({"source_sha256":format!("{:x}",digest.finalize()),"cargo_lock_sha256":format!("{:x}",Sha256::digest(include_bytes!("../Cargo.lock"))),"compiler":env!("ATLAS_RUSTC"),"profile":env!("ATLAS_PROFILE"),"architecture":std::env::consts::ARCH,"backend":BACKEND})
+    serde_json::json!({"kernel_version":"atlas-kernels/1","source_hashes":sources,"source_sha256":format!("{:x}",digest.finalize()),"cargo_lock_sha256":format!("{:x}",Sha256::digest(include_bytes!("../Cargo.lock"))),"compiler":env!("ATLAS_RUSTC"),"profile":env!("ATLAS_PROFILE"),"architecture":std::env::consts::ARCH,"backend":BACKEND})
 }
 pub fn benchmark() -> serde_json::Value {
     use serde_json::json;

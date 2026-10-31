@@ -4,6 +4,7 @@ import argparse
 import http.client
 import json
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -36,25 +37,34 @@ def main():
     app = Atlas(
         args.database, args.interval, discovery_interval=args.discovery_interval
     )
-    ble_bridge.investigate(app, "init")
+    server = None
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(app))
-    except OSError as error:
-        raise AtlasError(
-            "ATLAS_BIND_FAILED", details={"port": args.port, "errno": error.errno}
-        ) from error
-    app.refresh_network(auto_discover=False)
-    app.network_pending = bool(app.network.snapshot().get("connected"))
-    threading.Thread(target=app.network_observer, daemon=True).start()
-    threading.Thread(target=app.scheduler, daemon=True).start()
-    print(f"Atlas ready: http://127.0.0.1:{args.port}", flush=True)
-    try:
+        ble_bridge.investigate(app, "init")
+        try:
+            server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(app))
+        except OSError as error:
+            raise AtlasError(
+                "ATLAS_BIND_FAILED", details={"port": args.port, "errno": error.errno}
+            ) from error
+        app.refresh_network(auto_discover=False)
+        app.network_pending = bool(app.network.snapshot().get("connected"))
+        threading.Thread(target=app.network_observer, daemon=True).start()
+        threading.Thread(target=app.scheduler, daemon=True).start()
+        print(f"Atlas control token (shown once): {app.control_token}", flush=True)
+        print(f"Atlas ready: http://127.0.0.1:{args.port}", flush=True)
+
+        def terminate(signum, frame):
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGTERM, terminate)
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         app.stop.set()
-        server.server_close()
+        if server is not None:
+            server.server_close()
+        app.observer.close()
 
 
 if __name__ == "__main__":

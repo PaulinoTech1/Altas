@@ -67,7 +67,7 @@ class GatewayTests(unittest.TestCase):
             app=Atlas(Path(tmp)/'db');server=ThreadingHTTPServer(('127.0.0.1',0),handler(app))
             threading.Thread(target=server.serve_forever,daemon=True).start();conn=http.client.HTTPConnection('127.0.0.1',server.server_address[1])
             def post(path,body,token=None,origin=None):
-                headers={'Content-Type':'application/json'}
+                headers={'Content-Type':'application/json','X-Atlas-Control':app.control_token}
                 if token:headers['Authorization']='Bearer '+token
                 if origin:headers['Origin']=origin
                 conn.request('POST',path,json.dumps(body),headers);response=conn.getresponse();return response.status,json.loads(response.read())
@@ -77,9 +77,9 @@ class GatewayTests(unittest.TestCase):
                 payload={'observations':[{'host':'192.168.1.20','status':'responding','services':[{'port':80,'state':'open'}]}]}
                 self.assertEqual(post('/api/v2/ingest',payload)[0],401)
                 self.assertEqual(post('/api/v2/ingest',payload,sensor['token'])[1]['accepted'],1)
-                conn.request('GET','/api/v2/overview');r=conn.getresponse();overview=json.loads(r.read());self.assertTrue(any(n['kind']=='External IP observation' for n in overview['nodes']))
+                conn.request('GET','/api/v2/overview',headers={'X-Atlas-Control':app.control_token});r=conn.getresponse();overview=json.loads(r.read());self.assertTrue(any(n['kind']=='External IP observation' for n in overview['nodes']))
                 self.assertEqual(post('/api/v2/sensor_revoke',{'id':sensor['id']})[0],200)
                 self.assertEqual(post('/api/v2/ingest',payload,sensor['token'])[0],401)
                 self.assertEqual(post('/api/v2/import',{},origin='http://foreign.example')[0],403)
-                conn.request('GET','/api/v2/sensor_create');r=conn.getresponse();self.assertEqual(r.status,405);r.read()
+                conn.request('GET','/api/v2/sensor_create',headers={'X-Atlas-Control':app.control_token});r=conn.getresponse();self.assertEqual(r.status,405);r.read()
             finally:conn.close();server.shutdown();server.server_close()

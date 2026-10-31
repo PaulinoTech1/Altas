@@ -59,10 +59,11 @@ class Networks:
                 fingerprint=fingerprint,
                 created_at=at,
                 connected=bool(wifi),
+                visible_evidence=json.dumps(wifi or {}, sort_keys=True),
             )
             with self.store.connection() as c:
                 c.execute(
-                    "INSERT OR REPLACE INTO network_contexts(id,label,address,cidr,fingerprint,created_at,connected) VALUES(:id,:label,:address,:cidr,:fingerprint,:created_at,:connected)",
+                    "INSERT OR REPLACE INTO network_contexts(id,label,address,cidr,fingerprint,created_at,connected,visible_evidence) VALUES(:id,:label,:address,:cidr,:fingerprint,:created_at,:connected,:visible_evidence)",
                     context,
                 )
                 c.execute(

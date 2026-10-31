@@ -4,6 +4,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 from atlas import Atlas,handler
 from ble_bridge import investigate
 from http.server import ThreadingHTTPServer
+os.environ['ATLAS_CONTROL_TOKEN']='1'*64
 folder=tempfile.TemporaryDirectory();app=Atlas(folder.name+'/fixture.sqlite3')
 app.add('192.168.1.20','Office printer',[80,631]);app.save_identity('192.168.1.20',{'description':{'friendlyName':'Office','manufacturer':'Fixture','modelName':'Printer'}})
 app.record(1,{'status':'responding','services':[{'port':80,'state':'open','title':'Printer panel','latency_ms':2},{'port':631,'state':'open','latency_ms':3}]})

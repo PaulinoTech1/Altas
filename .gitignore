@@ -3,3 +3,6 @@ __pycache__/
 *.sqlite3-*
 *.log
 native/target/
+
+*.status.json
+*.wifi-context.json

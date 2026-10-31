@@ -111,4 +111,19 @@ The catalog must ship with the Python package and be rebuilt into Rust when chan
 
 ## Network changes
 
-`ATLAS_NETWORK_CHANGED` (HTTP 409, collection, retryable) rejects a write whose captured network context is no longer active. Wait for discovery on the current network, then retry. In-flight collectors discard stale results; previous contexts retain their existing history. Network switches are detected from visible address/subnet information, not inferred SSID names.
+`ATLAS_NETWORK_CHANGED` (HTTP 409, collection, retryable) rejects a write whose captured network context is no longer active. Wait for discovery on the current network, then retry. In-flight collectors discard stale results; previous contexts retain their existing history. Network switches are detected from visible address/subnet information and optional fresh, explicitly user-supplied hints; SSID names are not inferred.
+
+## Observer, control and evidence failures
+
+- `ATLAS_STATUS_WRITE_FAILED` (500, storage, not automatically retryable): The observer status file could not be updated. Check the status directory permissions; collection evidence may still be retained.
+- `ATLAS_CONTROL_AUTH_INVALID` (401, authorization, not automatically retryable): The local control token is missing or invalid. Unlock the dashboard with the token printed at process start.
+- `ATLAS_CONTROL_TOKEN_INVALID` (500, configuration, not automatically retryable): The configured control token is invalid. Set ATLAS_CONTROL_TOKEN to exactly 64 hexadecimal characters or unset it.
+- `ATLAS_WIFI_CONTEXT_INVALID` (422, capability, not automatically retryable): The optional Wi-Fi context file is invalid or stale. Provide the documented bounded JSON with current timestamps and matching visible address and mask.
+- `ATLAS_WIFI_CONTEXT_MISSING` (200, capability, not automatically retryable): No optional Wi-Fi context file is available. Visible address and mask remain the only context inputs.
+- `ATLAS_EXPORT_LIMIT` (422, capacity, not automatically retryable): The evidence bundle exceeds its byte limit. Export a smaller observation page using the returned cursor.
+
+Missing or invalid control credentials reject every API route before body processing or dispatch. Assets contain no token. Sensor ingestion requires both X-Atlas-Control and a separate sensor Bearer credential; neither substitutes for the other. Host and Origin checks apply to reads as well as writes. Error diagnostics never contain token values.
+
+A status-file write failure does not roll back committed evidence or retain collection locks. Health exposes status_failure; failed checkpoint storage uses the existing storage codes. Temporary status files are removed on failure. Abrupt process death cannot write a stop marker; its stale file remains evidence of the last published state, not proof of liveness. Normal SIGTERM/keyboard shutdown writes stopped.
+
+Optional context failures discard all optional hints for that read and retain only visible address/mask. Expiry, disappearance or a corrected hint can create a new context; previous context records are retained. No failure response includes malformed file contents. An oversized bundle returns ATLAS_EXPORT_LIMIT, never an apparently complete partial archive; reduce limit and use cursor pagination. Retention errors roll back observation, event and explicitly marked snapshot deletion together. Invalid timestamps cannot satisfy the age predicate and remain retained.

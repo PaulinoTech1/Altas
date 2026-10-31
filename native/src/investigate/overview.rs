@@ -85,6 +85,6 @@ pub(super) fn health(c: &Connection) -> Result<Value> {
     )?;
     let stale:i64=c.query_row("SELECT count(*) FROM targets t WHERE paused=0 AND network_id=(SELECT active_id FROM network_state WHERE id=1) AND NOT EXISTS(SELECT 1 FROM observations o WHERE o.target_id=t.id AND julianday(o.at)>julianday('now','-30 minutes'))",[],|r|r.get(0))?;
     Ok(
-        json!({"database_bytes":db_size,"journal_mode":journal,"stale_or_unobserved_targets":stale,"runs":runs,"limits":{"capture_bytes":1000000,"packets_per_import":10000,"packet_page":100,"replay_points":2000,"map_local_targets":64,"map_ble_nodes":256,"map_external_nodes":128},"engine":"Rust + SQLite; ARM64 NEON capture decoding"}),
+        json!({"database_bytes":db_size,"journal_mode":journal,"stale_or_unobserved_targets":stale,"runs":runs,"gaps":rows(c,"SELECT * FROM collection_gaps ORDER BY id DESC LIMIT 30",&[])?,"gap_limit":30,"limits":{"capture_bytes":1000000,"packets_per_import":10000,"packet_page":100,"replay_points":2000,"map_local_targets":64,"map_ble_nodes":256,"map_external_nodes":128},"engine":"Rust + SQLite; ARM64 NEON capture decoding"}),
     )
 }

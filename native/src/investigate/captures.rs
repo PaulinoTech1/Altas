@@ -43,6 +43,16 @@ pub(super) fn import(c: &mut Connection, r: &Value, sensor: &str) -> Result<Valu
     let at = timestamp(&tx)?;
     tx.execute("INSERT INTO capture_sessions(capture_key,name,source,imported_at,digest,source_text,sensor,packets,rejected) VALUES(?,?,?,?,?,?,?,?,?)",params![key,name,source,at,digest,content,sensor,packets.len()as i64,number(&parsed,"rejected_lines",0)])?;
     let sid = tx.last_insert_rowid();
+    let batch = evidence::imported_batch(
+        &tx,
+        "ble_import",
+        sensor,
+        json!({"format":"Nordic TIME ADDRESS RSSI HEXDATA","source_digest":digest,"max_bytes":1000000,"packet_limit":10000,"limit_reached":parsed["limit_reached"],"rejected_lines":parsed["rejected_lines"]}),
+    )?;
+    tx.execute(
+        "UPDATE capture_sessions SET batch_id=? WHERE id=?",
+        params![batch, sid],
+    )?;
     let mut previous = 0i64;
     let mut day = 0i64;
     let mut origin = None;
@@ -92,13 +102,19 @@ pub(super) fn import(c: &mut Connection, r: &Value, sensor: &str) -> Result<Valu
                 |q| q.get(0),
             )?;
             if !seen {
-                alert(
+                let created = alert(
                     &tx,
                     &entity,
                     "new_ble",
                     &entity,
                     "New BLE address in imported or sensor observations; address may be randomized",
                 )?;
+                if created {
+                    tx.execute(
+                        "UPDATE local_alerts SET batch_id=? WHERE alert_key=? AND batch_id IS NULL",
+                        params![batch, entity],
+                    )?;
+                }
             }
             snapshot(&tx, &entity, &identity)?;
             identities.insert(entity, signature);

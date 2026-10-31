@@ -50,6 +50,12 @@ pub(super) fn ingest(c: &mut Connection, r: &Value) -> Result<Value> {
             return Err(Failure::input("observations").into());
         }
         let tx = c.transaction()?;
+        let batch = evidence::imported_batch(
+            &tx,
+            "sensor_ip",
+            &sensor,
+            json!({"max_observations":64,"max_services":32,"max_observation_bytes":16384,"observations":observations.len()}),
+        )?;
         for o in observations {
             let host = text(o, "host");
             host.parse::<std::net::IpAddr>()?;
@@ -75,8 +81,8 @@ pub(super) fn ingest(c: &mut Connection, r: &Value) -> Result<Value> {
                 return Err(Failure::input("observation_size").into());
             }
             tx.execute(
-                "INSERT INTO sensor_observations(sensor,host,at,data) VALUES(?,?,?,?)",
-                params![sensor, host, timestamp(&tx)?, encoded],
+                "INSERT INTO sensor_observations(sensor,host,at,data,batch_id) VALUES(?,?,?,?,?)",
+                params![sensor, host, timestamp(&tx)?, encoded, batch],
             )?;
         }
         tx.commit()?;
