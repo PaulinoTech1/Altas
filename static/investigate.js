@@ -630,6 +630,8 @@
             .join("\n\n"),
         ) +
         "</pre></article>";
+    const observer = h.runtime.observer;
+    if (observer) $("#health-summary").innerHTML += `<article class="panel"><h3>Observation freshness</h3><p>Last successful run: ${esc(observer.last_successful_collection || "none")}<br>Wall clock: ${esc(observer.wall_clock_at)}<br>Age: ${esc(observer.seconds_since_success === null ? "unknown" : Math.round(observer.seconds_since_success) + " seconds")} · ${observer.overdue ? "overdue" : "within interval or unknown"}</p><p>Android may suspend Termux. Successful run completion does not mean a device responded.</p></article>`;
     $("#health-runs").innerHTML =
       h.runs
         .map(

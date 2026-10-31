@@ -54,6 +54,7 @@ def main():
         pass
     finally:
         app.stop.set()
+        app.observer.close()
         server.server_close()
 
 

@@ -1,6 +1,7 @@
 """SQLite lifecycle and backward-compatible schema initialization."""
 
 import sqlite3
+from .config import ROOT
 from contextlib import contextmanager
 
 TARGETS = """CREATE TABLE targets(id INTEGER PRIMARY KEY,host TEXT NOT NULL,label TEXT NOT NULL,
@@ -43,6 +44,7 @@ class Store:
             """
                 + NETWORK_SCHEMA
             )
+            c.executescript((ROOT / "evidence_schema.sql").read_text())
             c.execute("BEGIN IMMEDIATE")
             for table, definition in [("targets", TARGETS), ("identities", IDENTITIES)]:
                 if not c.execute(

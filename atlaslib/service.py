@@ -19,6 +19,7 @@ from .config import DEFAULT_PORTS
 from .errors import AtlasError, log_failure
 from .storage import Store
 from .networks import Networks
+from .observer import Observer
 from . import collectors
 
 
@@ -57,6 +58,7 @@ class Atlas:
         self.store = Store(self.database)
         self.store.initialize()
         self.network = Networks(self.store)
+        self.observer = Observer(self.store, self.interval, self.network)
         self.network_tracking = False
         self.network_pending = False
         self.network_failure = None
@@ -97,6 +99,9 @@ class Atlas:
                 failure, operation="collector_metrics"
             ).failure()
 
+        finally:
+            self.observer.completed(error is None and self.metrics_failure is None)
+
     def refresh_network(self, auto_discover=True, force=False):
         wifi = self.wifi_network()
         with self.network.lock:
@@ -131,6 +136,7 @@ class Atlas:
         self.network_tracking = True
         while not self.stop.is_set():
             try:
+                self.observer.tick()
                 self.refresh_network()
             except Exception as error:
                 self.network_failure = log_failure(
@@ -161,6 +167,7 @@ class Atlas:
             next_discovery_in_seconds=max(
                 0, round(self.discovery_next_due - time.monotonic())
             ),
+            observer=self.observer.snapshot(),
             started_at=self.started_at,
             scanning=self.scanning,
             discovery=self.discovery.copy(),

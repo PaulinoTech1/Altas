@@ -278,5 +278,47 @@
     "retryable": true,
     "summary": "The active network changed during the operation.",
     "action": "Wait for discovery on the current network, then retry the operation."
+  },
+  "ATLAS_STATUS_WRITE_FAILED": {
+    "status": 500,
+    "category": "storage",
+    "retryable": false,
+    "summary": "The observer status file could not be updated.",
+    "action": "Check the status directory permissions; collection evidence may still be retained."
+  },
+  "ATLAS_CONTROL_AUTH_INVALID": {
+    "status": 401,
+    "category": "authorization",
+    "retryable": false,
+    "summary": "The local control token is missing or invalid.",
+    "action": "Unlock the dashboard with the token printed at process start."
+  },
+  "ATLAS_CONTROL_TOKEN_INVALID": {
+    "status": 500,
+    "category": "configuration",
+    "retryable": false,
+    "summary": "The configured control token is invalid.",
+    "action": "Set ATLAS_CONTROL_TOKEN to exactly 64 hexadecimal characters or unset it."
+  },
+  "ATLAS_WIFI_CONTEXT_INVALID": {
+    "status": 422,
+    "category": "capability",
+    "retryable": false,
+    "summary": "The optional Wi-Fi context file is invalid or stale.",
+    "action": "Provide the documented bounded JSON with current timestamps and matching visible address and mask."
+  },
+  "ATLAS_WIFI_CONTEXT_MISSING": {
+    "status": 200,
+    "category": "capability",
+    "retryable": false,
+    "summary": "No optional Wi-Fi context file is available.",
+    "action": "Visible address and mask remain the only context inputs."
+  },
+  "ATLAS_EXPORT_LIMIT": {
+    "status": 422,
+    "category": "capacity",
+    "retryable": false,
+    "summary": "The evidence bundle exceeds its byte limit.",
+    "action": "Export a smaller observation page using the returned cursor."
   }
 }
