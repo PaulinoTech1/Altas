@@ -94,6 +94,12 @@ class Store:
                     "INSERT OR IGNORE INTO network_contexts(id,label,created_at,connected) VALUES('legacy','Earlier observations (network unknown)',strftime('%Y-%m-%dT%H:%M:%fZ','now'),0)"
                 )
 
+            if "visible_evidence" not in {
+                r["name"] for r in c.execute("PRAGMA table_info(network_contexts)")
+            }:
+                c.execute(
+                    "ALTER TABLE network_contexts ADD COLUMN visible_evidence TEXT"
+                )
             for table in ("observations", "events", "identities", "collection_runs"):
                 columns = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
                 if "batch_id" not in columns:

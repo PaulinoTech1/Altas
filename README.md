@@ -19,6 +19,8 @@ For other check intervals or database locations:
 python3 atlas.py --interval 600 --port 8765 --database ./atlas.sqlite3
 ```
 
+The CLI prints a 256-bit local control token once. Enter it in the dashboard to unlock API access; it stays only in page memory. Every API request (including exports and sensor ingestion) requires `X-Atlas-Control: TOKEN`. Optionally set `ATLAS_CONTROL_TOKEN` to exactly 64 hexadecimal characters before starting; otherwise each restart rotates the token.
+
 The default check interval is five minutes. The server binds only to IPv4 loopback. Android may suspend or stop Termux, so uninterrupted background collection is not guaranteed. No application permissions or radio privileges are bypassed.
 
 ## Workspaces
@@ -33,7 +35,7 @@ Atlas checks Wi-Fi link information every two seconds and refreshes the visible 
 
 The map defaults to **Current Wi-Fi**. Select an earlier context to inspect history; historical results are labeled and never presented as current reachability. Target addresses and device metadata are unique within their context, so `192.168.1.20` on one network does not inherit another network's identity or history. Existing pre-context observations are retained under **Earlier observations (network unknown)**. A full legacy inventory does not consume the new context's 64-target allowance.
 
-Android currently withholds SSID/BSSID information. Two Wi-Fi networks exposing identical visible address/subnet fields cannot be distinguished reliably. Use **Start fresh network context** in that case; it preserves history and rediscovers the current subnet. A DHCP address change can also create a new context. Contexts describe observation visits, not verified SSID identities. A disconnect hides previous local network targets; imported BLE and external sensor observations retain their separate provenance.
+Android currently withholds SSID/BSSID information. Without a fresh optional user-supplied status hint (documented below), two Wi-Fi networks exposing identical visible address/subnet fields cannot be distinguished reliably. Use **Start fresh network context** in that case; it preserves history and rediscovers the current subnet. A DHCP address change can also create a new context. Contexts describe observation visits, not verified SSID identities. A disconnect hides previous local network targets; imported BLE and external sensor observations retain their separate provenance.
 
 The default workspace visualizes local IP observations, imported BLE addresses, and external sensor reports. Search by address, label, model or service; filter IP/BLE nodes; zoom, pan, and select nodes with touch, mouse or keyboard. Maps are paginated to 36 device nodes per page, plus their observer nodes. The inspector shows evidence, timestamps, identity snapshots and recent changes, and can download a device report.
 
@@ -60,7 +62,7 @@ Imports are bounded to 1 MB and 10,000 matching packets. Unmatched line counts a
 
 ### Alerts and identity history
 
-Rules cover new BLE addresses, new observed network services, certificate changes, repeated checks without TCP responses, and stale observations. Enable/disable generation and configure missed-check and stale-time thresholds. Acknowledge records individually. Alerts are historical records, not automatically cleared current incident states, and no Android notification integration is enabled.
+Rules cover new BLE addresses, new observed network services, certificate changes, repeated checks without TCP responses, and stale observations. Enable/disable generation and configure missed-check and stale-time thresholds. Acknowledge records individually. Alerts are historical records, not automatically cleared current incident states, and no Android notification integration is enabled. The observer additionally writes a local status file; it does not install a notification writer.
 
 Alerts and identity snapshots update after collection runs, BLE imports, and map/feed refreshes. Existing network events remain available, while identity snapshots begin with this feature's introduction. Snapshot history is bounded to the latest 100 changes per entity in the UI/API; the database retains all entries. Imported BLE signal fluctuations do not themselves create identity changes.
 
@@ -73,6 +75,7 @@ BLE submission:
 ```sh
 curl http://127.0.0.1:8765/api/v2/ingest \
   -H 'Content-Type: application/json' \
+  -H "X-Atlas-Control: $ATLAS_CONTROL_TOKEN" \
   -H "Authorization: Bearer $ATLAS_SENSOR_TOKEN" \
   --data-binary @sensor-capture.json
 ```
@@ -113,7 +116,7 @@ The new investigation/query/storage logic is Rust (`native/src/investigate/`), a
 
 Dependencies are pinned in `native/Cargo.lock`. SQLite is bundled through rusqlite. The ARM64 hex decoder validates bytes and uses 16-character NEON blocks with a scalar tail; portable Rust is the non-AArch64 fallback. See [native/BENCHMARK.md](native/BENCHMARK.md) for earlier local microbenchmarks. Those timings are not end-to-end import guarantees.
 
-All queries have response limits: 200 recent sessions, 100 alert records, 100 identity snapshots, 200 target events, 1,000 address summaries per session comparison, 256 BLE nodes, and 2,000 replay points. Packet search uses bounded output pages but substring searches can scan stored data. Full data remains in SQLite. History, retained source files and collection records grow until managed externally; automatic retention/deletion is not enabled.
+All queries have response limits: 200 recent sessions, 100 alert records, 100 identity snapshots, 200 target events, 1,000 address summaries per session comparison, 256 BLE nodes, and 2,000 replay points. Packet search uses bounded output pages but substring searches can scan stored data. Full data remains in SQLite. Explicit context-scoped retention is available in Collection health; automatic deletion remains disabled. Retained source files, contracts, gaps and collection records continue to grow until managed externally.
 
 ## Verification
 
@@ -141,6 +144,37 @@ python3 tests/gui_fixture.py
 NODE_PATH=/tmp/atlas-gui-check/node_modules node tests/gui_dom.cjs
 NODE_PATH=/tmp/atlas-gui-check/node_modules node tests/gui_network.cjs
 NODE_PATH=/tmp/atlas-gui-check/node_modules node tests/gui_research.cjs
+NODE_PATH=/tmp/atlas-gui-check/node_modules node tests/gui_evidence.cjs
 ```
 
 The fixture binds to `127.0.0.1:8877`. Override `ATLAS_TEST_PORT` for the fixture and `ATLAS_TEST_URL` for the DOM harness if necessary. The harness exercises map selection/search, workspace navigation, session replay, packet filtering, alert acknowledgement, sensor create/revoke and health. It checks script behavior, not layout. Chromium was attempted in this PRoot environment but exited before opening a page, so visual browser verification remains unavailable here.
+
+## Observer evidence, retention and exports
+
+Collection health shows last successful collector completion against wall clock, signed age, overdue status and recorded gaps. `<database>.status.json` is atomically updated on start, collector completion and graceful stop, readable from ordinary Termux/file tooling. Its mtime/state is the last published state, not proof that Android has kept the process running. SQLite checkpoints let restarts, delays beyond the interval and clock discontinuities become explicit gap records; their cause is not inferred.
+
+Each new local batch freezes its selected ports, timeouts, worker counts, bounds, collector source version, network fingerprint and failure catalog. Imported BLE captures and sensor IP posts carry distinct method contracts with unknown remote collection details. Legacy contracts remain unknown. Research and alert batch IDs can be resolved using `/api/v2/collection_contract?id=ID`.
+
+In **Collection health**, select a context to export a self-contained JSON evidence bundle or purge older observations/events. UI purges preserve all identity snapshots. The advanced API permits explicit snapshot IDs; it never deletes contexts or target identities automatically:
+
+```sh
+curl http://127.0.0.1:8765/api/v2/purge \
+  -H "X-Atlas-Control: $ATLAS_CONTROL_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"network_id":"CONTEXT_ID","age_seconds":2592000,"delete_snapshot_ids":[]}'
+```
+
+Purge counts are transactional and exact. It applies only to selected-context local TCP observations/events older than the cutoff (and explicitly selected old snapshots). Contracts, alerts, contexts, target configuration, identities, unmarked snapshots, BLE imports and sensor posts remain. Disk file size may not shrink.
+
+`GET /api/v2/evidence_bundle?network_id=CONTEXT_ID&limit=100` exports up to 100 observations and their contracts/catalogs plus bounded gap/context evidence. Follow archive.next_cursor with `cursor` for older pages; every archive records omissions and limits. An 8 MB ceiling rejects oversized pages rather than silently truncating them. No external assets, stable-identity claims or authenticity signatures are added. The SQLite backup is a separate full-database export.
+
+Research notebooks and reports retain exact source hashes, kernel version and analysis truncation flags. They remain descriptive offline analyses, not hypothesis tests or evidence of location or physical topology.
+
+## Optional Wi-Fi status hints
+
+A user-provided file may enrich the phone's context fingerprint. Default path: `<database>.wifi-context.json`; override with `ATLAS_WIFI_CONTEXT_FILE`. Atlas supplies only the reader. A separate user-chosen writer must atomically replace a fresh file; no writer or Android radio permission is provided:
+
+```json
+{"address":"192.168.1.10","cidr":"192.168.1.0/24","observed_at":"2026-10-31T12:00:00Z","ssid":"Example","bssid":"AA:BB:CC:DD:EE:FF","network_token":"optional-visit-token"}
+```
+
+This is a synthetic format example. Address/cidr must exactly match the visible link; observed_at must include a timezone and be no older than 120 seconds (maximum 5 seconds future skew). Include at least one optional hint; file limit is 4096 bytes, SSID 32 UTF-8 bytes, token 128 bytes, and BSSID must have MAC syntax. Unknown fields are ignored. Missing/malformed/stale files produce explicit capability diagnostics and fall back to address/mask; hint expiry can start a new context. Validated hints retain user-supplied/unverified provenance and cannot prove other devices' SSID membership. Without a fresh hint, identical visible address/mask networks remain indistinguishable; manual context reset remains available.

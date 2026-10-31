@@ -51,8 +51,8 @@ class WorkbenchApiTests(unittest.TestCase):
             conn=http.client.HTTPConnection('127.0.0.1',server.server_address[1])
             try:
                 body=json.dumps({'source':'fixture','text':'12:00:00 AA:BB:CC:DD:EE:FF -45 050954657374'})
-                conn.request('POST','/api/ble/import',body,{'Content-Type':'application/json'})
+                conn.request('POST','/api/ble/import',body,{'Content-Type':'application/json','X-Atlas-Control':app.control_token})
                 r=conn.getresponse();self.assertEqual(r.status,200);self.assertEqual(json.loads(r.read())['imported'],1)
-                conn.request('GET','/api/ble/history/AA%3ABB%3ACC%3ADD%3AEE%3AFF')
+                conn.request('GET','/api/ble/history/AA%3ABB%3ACC%3ADD%3AEE%3AFF',headers={'X-Atlas-Control':app.control_token})
                 r=conn.getresponse();self.assertEqual(r.status,200);self.assertEqual(json.loads(r.read())['mean_rssi'],-45)
             finally:conn.close();server.shutdown();server.server_close()

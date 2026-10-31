@@ -83,3 +83,13 @@ class RetentionTests(unittest.TestCase):
             self.assertEqual(
                 c.execute("select count(*) from identity_history").fetchone()[0], 3
             )
+
+    def test_snapshot_ids_are_not_reused_after_purge(self):
+        investigate(
+            self.app, "purge", network_id="", age_seconds=60, delete_snapshot_ids=[3]
+        )
+        investigate(self.app, "sync")
+        with self.app.db() as c:
+            self.assertGreater(
+                c.execute("select max(id) from identity_history").fetchone()[0], 3
+            )

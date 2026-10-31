@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from atlas import Atlas
+from atlaslib.wifi_context import read_context
 from ble_bridge import investigate
 from atlaslib.errors import AtlasError
 
@@ -91,3 +92,53 @@ class EvidenceExtensionTests(unittest.TestCase):
             self.assertIn(key, report)
         self.assertIn("atlas-kernels/1", report)
 
+    def hint(self, **overrides):
+        data = {
+            **self.visible,
+            "observed_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "ssid": "Example",
+            "bssid": "aa:bb:cc:dd:ee:ff",
+            **overrides,
+        }
+        path = Path(self.app.wifi_context_path)
+        path.write_text(json.dumps(data))
+        return path
+
+    def test_wifi_hints_fresh_matching_only_and_fingerprint_changes(self):
+        path = self.hint()
+        result, failure = read_context(path, self.visible, time.time())
+        self.assertIsNone(failure)
+        self.assertEqual(result["bssid"], "AA:BB:CC:DD:EE:FF")
+        original = self.app.network.id
+        self.app.network.observe(result)
+        self.assertNotEqual(original, self.app.network.id)
+        for overrides in (
+            {"address": "10.0.0.2"},
+            {"observed_at": "2000-01-01T00:00:00Z"},
+            {"observed_at": "bad"},
+            {"ssid": 123},
+            {"bssid": "invalid"},
+            {"ssid": "x" * 33},
+        ):
+            with self.subTest(overrides=overrides):
+                result, failure = read_context(
+                    self.hint(**overrides), self.visible, time.time()
+                )
+                self.assertEqual(result, self.visible)
+                self.assertEqual(failure["code"], "ATLAS_WIFI_CONTEXT_INVALID")
+        path.write_text("[")
+        self.assertEqual(
+            read_context(path, self.visible, time.time())[1]["code"],
+            "ATLAS_WIFI_CONTEXT_INVALID",
+        )
+        path.write_text("x" * 4097)
+        self.assertEqual(
+            read_context(path, self.visible, time.time())[1]["code"],
+            "ATLAS_WIFI_CONTEXT_INVALID",
+        )
+        path.unlink()
+        self.assertEqual(
+            read_context(path, self.visible, time.time())[1]["code"],
+            "ATLAS_WIFI_CONTEXT_MISSING",
+        )
+        self.assertEqual(read_context(path, None, time.time()), (None, None))

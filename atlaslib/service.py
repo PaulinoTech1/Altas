@@ -22,7 +22,8 @@ from .errors import AtlasError, log_failure
 from .storage import Store
 from .networks import Networks
 from .observer import Observer
-from .evidence import begin_batch, DISCOVERY_PORTS
+from .wifi_context import read_context
+from .evidence import begin_batch, DISCOVERY_PORTS, freeze_collector
 from . import collectors
 
 
@@ -64,10 +65,15 @@ class Atlas:
         self.started_at = now()
         self.investigation_error = None
         self.stop = threading.Event()
+        freeze_collector(self)
         self.store = Store(self.database)
         self.store.initialize()
         self.network = Networks(self.store)
         self.observer = Observer(self.store, self.interval, self.network)
+        self.wifi_context_failure = None
+        self.wifi_context_path = os.environ.get(
+            "ATLAS_WIFI_CONTEXT_FILE", self.database + ".wifi-context.json"
+        )
         self.network_tracking = False
         self.network_pending = False
         self.network_failure = None
@@ -110,7 +116,12 @@ class Atlas:
             ).failure()
 
         finally:
-            self.observer.completed(error is None and self.metrics_failure is None)
+            try:
+                self.observer.completed(error is None and self.metrics_failure is None)
+            except Exception as failure:
+                self.observer.failure = log_failure(
+                    failure, operation="observer_checkpoint"
+                ).failure()
 
     def refresh_network(self, auto_discover=True, force=False):
         wifi = self.wifi_network()
@@ -173,6 +184,7 @@ class Atlas:
             network=self.network.snapshot(),
             network_pending=self.network_pending,
             network_failure=self.network_failure,
+            wifi_context_failure=self.wifi_context_failure,
             discovery_interval=self.discovery_interval,
             next_discovery_in_seconds=max(
                 0, round(self.discovery_next_due - time.monotonic())
@@ -576,6 +588,9 @@ class Atlas:
                     result = future.result()
                     if not self.network.is_current(context):
                         self.discovery["cancelled"] = True
+                        self.discovery["error"] = AtlasError(
+                            "ATLAS_NETWORK_CHANGED"
+                        ).message
                         for pending in futures:
                             pending.cancel()
                         break
@@ -739,14 +754,14 @@ class Atlas:
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                 for target, data in zip(targets, pool.map(current_scan, targets)):
                     if not self.network.is_current(context):
-                        break
+                        raise AtlasError("ATLAS_NETWORK_CHANGED")
                     if (
                         self.record(
                             target["id"], data, network_id=context, batch_id=batch_id
                         )
                         is False
                     ):
-                        break
+                        raise AtlasError("ATLAS_NETWORK_CHANGED")
                     completed += 1
             self.last_error = None
             self.last_failure = None
@@ -836,7 +851,11 @@ class Atlas:
         )
 
     def wifi_network(self):
-        return collectors.wifi_network()
+        visible = collectors.wifi_network()
+        result, self.wifi_context_failure = read_context(
+            self.wifi_context_path, visible, time.time()
+        )
+        return result
 
     def device_description(self, host, location):
         return collectors.device_description(host, location)

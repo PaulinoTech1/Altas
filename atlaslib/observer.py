@@ -75,6 +75,8 @@ class Observer:
 
     def completed(self, success):
         with self.lock:
+            if self.state == "stopped":
+                return
             self.tick()
             self.state = "collection_completed"
             if success:
@@ -110,6 +112,7 @@ class Observer:
             )
 
     def publish(self):
+        self.failure = None
         temporary = None
         try:
             fd, temporary = tempfile.mkstemp(
@@ -119,7 +122,7 @@ class Observer:
                 json.dump(self.snapshot(), out)
             os.replace(temporary, self.path)
             self.failure = None
-        except OSError as error:
+        except OSError:
             self.failure = log_failure(
                 AtlasError("ATLAS_STATUS_WRITE_FAILED"), operation="observer_status"
             ).failure()
