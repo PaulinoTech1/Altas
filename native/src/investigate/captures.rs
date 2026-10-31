@@ -102,18 +102,20 @@ pub(super) fn import(c: &mut Connection, r: &Value, sensor: &str) -> Result<Valu
                 |q| q.get(0),
             )?;
             if !seen {
-                alert(
+                let created = alert(
                     &tx,
                     &entity,
                     "new_ble",
                     &entity,
                     "New BLE address in imported or sensor observations; address may be randomized",
                 )?;
+                if created {
+                    tx.execute(
+                        "UPDATE local_alerts SET batch_id=? WHERE alert_key=? AND batch_id IS NULL",
+                        params![batch, entity],
+                    )?;
+                }
             }
-            tx.execute(
-                "UPDATE local_alerts SET batch_id=? WHERE alert_key=? AND batch_id IS NULL",
-                params![batch, entity],
-            )?;
             snapshot(&tx, &entity, &identity)?;
             identities.insert(entity, signature);
         }

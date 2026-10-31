@@ -2,6 +2,7 @@
 use super::*;
 pub(super) fn initialize(c: &Connection) -> Result<()> {
     c.execute_batch(include_str!("../../../evidence_schema.sql"))?;
+    c.execute_batch("INSERT OR IGNORE INTO evidence_sequences SELECT 'identity_history',coalesce(max(id),0) FROM identity_history; CREATE TRIGGER IF NOT EXISTS identity_sequence AFTER INSERT ON identity_history BEGIN UPDATE evidence_sequences SET value=max(value,new.id) WHERE name='identity_history'; END;")?;
     for table in [
         "observations",
         "events",

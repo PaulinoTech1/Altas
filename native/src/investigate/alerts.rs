@@ -6,14 +6,15 @@ pub(super) fn alert(
     kind: &str,
     entity: &str,
     message: &str,
-) -> Result<()> {
+) -> Result<bool> {
     let enabled: bool = c.query_row("SELECT enabled FROM alert_rules WHERE id=1", [], |r| {
         r.get(0)
     })?;
     if enabled {
-        c.execute("INSERT OR IGNORE INTO local_alerts(alert_key,at,kind,entity,message) VALUES(?,?,?,?,?)",params![key,timestamp(c)?,kind,entity,message])?;
+        let changed=c.execute("INSERT OR IGNORE INTO local_alerts(alert_key,at,kind,entity,message) VALUES(?,?,?,?,?)",params![key,timestamp(c)?,kind,entity,message])?;
+        return Ok(changed > 0);
     }
-    Ok(())
+    Ok(false)
 }
 pub(super) fn snapshot(c: &Connection, entity: &str, data: &Value) -> Result<()> {
     let encoded = data.to_string();
@@ -27,7 +28,7 @@ pub(super) fn snapshot(c: &Connection, entity: &str, data: &Value) -> Result<()>
         .optional()?;
     if prev.as_deref() != Some(&digest) {
         c.execute(
-            "INSERT INTO identity_history(entity,at,digest,data) VALUES(?,?,?,?)",
+            "INSERT INTO identity_history(id,entity,at,digest,data) SELECT (SELECT value+1 FROM evidence_sequences WHERE name='identity_history'),?,?,?,?",
             params![entity, timestamp(c)?, digest, encoded],
         )?;
     }
@@ -53,17 +54,19 @@ pub(super) fn sync(c: &Connection) -> Result<()> {
             || message.starts_with("Baseline recorded")
             || message.contains("monitoring started (open)")
         {
-            alert(
+            let created = alert(
                 c,
                 &format!("event:{cursor}"),
                 "network_change",
                 &format!("ip:{}", number(&e, "target_id", 0)),
                 message,
             )?;
-            c.execute(
-                "UPDATE local_alerts SET batch_id=? WHERE alert_key=? AND batch_id IS NULL",
-                params![e["batch_id"].as_i64(), format!("event:{cursor}")],
-            )?;
+            if created {
+                c.execute(
+                    "UPDATE local_alerts SET batch_id=? WHERE alert_key=? AND batch_id IS NULL",
+                    params![e["batch_id"].as_i64(), format!("event:{cursor}")],
+                )?;
+            }
         }
     }
     c.execute(
@@ -85,15 +88,17 @@ pub(super) fn sync(c: &Connection) -> Result<()> {
         let last=rows(c,"SELECT id,at,batch_id,json_extract(data,'$.status') AS status FROM observations WHERE target_id=? ORDER BY id DESC LIMIT ?",&[&id,&missed])?;
         if last.len()==missed as usize && last.iter().all(|r|r["status"]=="no_response"){
             let last_good:i64=c.query_row("SELECT coalesce(max(id),0) FROM observations WHERE target_id=? AND json_extract(data,'$.status')='responding'",[id],|r|r.get(0))?;
-            alert(c,&format!("missed:{id}:{last_good}"),"missed_checks",&entity,&format!("{missed} consecutive checks received no TCP response; device power state unknown"))?;
-        }
-        if let Some(newest)=last.first(){
-            c.execute("UPDATE local_alerts SET batch_id=? WHERE entity=? AND kind='missed_checks' AND batch_id IS NULL",params![newest["batch_id"].as_i64(),entity])?;
+            let key=format!("missed:{id}:{last_good}");
+            if alert(c,&key,"missed_checks",&entity,&format!("{missed} consecutive checks received no TCP response; device power state unknown"))? {
+                c.execute("UPDATE local_alerts SET batch_id=? WHERE alert_key=?",params![last[0]["batch_id"].as_i64(),key])?;
+            }
         }
         let stale_row:Option<i64>=c.query_row("SELECT id FROM observations WHERE target_id=? AND julianday(at)<julianday('now',?) ORDER BY id DESC LIMIT 1",params![id,format!("-{stale} minutes")],|r|r.get(0)).optional()?;
-        if let (Some(old),Some(newest))=(stale_row,last.first()) {if old==number(newest,"id",0){alert(c,&format!("stale:{id}:{old}"),"stale",&entity,"No fresh observation within the configured stale interval")?;}}
+        if let (Some(old),Some(newest))=(stale_row,last.first()) {if old==number(newest,"id",0){let key=format!("stale:{id}:{old}");
+            if alert(c,&key,"stale",&entity,"No fresh observation within the configured stale interval")? {
+                c.execute("UPDATE local_alerts SET batch_id=? WHERE alert_key=?",params![newest["batch_id"].as_i64(),key])?;
+            }}}
     }
-    c.execute("UPDATE local_alerts SET batch_id=(SELECT batch_id FROM observations WHERE target_id=cast(substr(local_alerts.entity,4) AS INTEGER) ORDER BY id DESC LIMIT 1) WHERE kind='stale' AND batch_id IS NULL",[])?;
     Ok(())
 }
 pub(super) fn detail(c: &Connection, r: &Value) -> Result<Value> {
