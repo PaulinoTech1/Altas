@@ -192,8 +192,24 @@ def handler(app):
                 result["runtime"] = app.runtime()
             return self.reply(result)
 
+        def authorize(self):
+            host = self.headers.get("Host", "")
+            port = self.server.server_address[1]
+            if host not in (f"127.0.0.1:{port}", f"localhost:{port}"):
+                raise AtlasError("ATLAS_ORIGIN_REJECTED")
+            origin = self.headers.get("Origin")
+            if origin and origin != "http://" + host:
+                raise AtlasError("ATLAS_ORIGIN_REJECTED")
+            supplied = self.headers.get("X-Atlas-Control", "")
+            if not secrets.compare_digest(
+                supplied.encode(), app.control_token.encode()
+            ):
+                raise AtlasError("ATLAS_CONTROL_AUTH_INVALID")
+
         def get(self):
             path = urlsplit(self.path).path
+            if path.startswith("/api/"):
+                self.authorize()
             if path.startswith("/api/v2/"):
                 return self.v2(
                     path,
@@ -308,8 +324,11 @@ def handler(app):
             return data
 
         def post(self):
+            self.authorize()
             data = self.read_object()
             path = urlsplit(self.path).path
+            if path == "/api/control/unlock":
+                return self.reply({"ok": True})
             if path.startswith("/api/v2/"):
                 return self.v2(path, data, True)
             if path == "/api/ble/import":

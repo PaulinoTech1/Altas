@@ -6,7 +6,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(check){for(let i=0;i<160;i++){if(check())return;await wait(75);}throw Error('Research GUI did not reach the expected state');}
 (async()=>{const errors=[];let downloads=0;const console=new VirtualConsole();console.on('jsdomError',e=>{if(e.type!=='css-parsing')errors.push(e.message);});
  const dom=await JSDOM.fromURL(base,{resources:'usable',runScripts:'dangerously',pretendToBeVisual:true,virtualConsole:console,beforeParse(w){w.fetch=(path,opts)=>fetch(new URL(path,base),opts);w.TextEncoder=TextEncoder;w.URL.createObjectURL=()=>{downloads++;return 'blob:fixture';};w.URL.revokeObjectURL=()=>{};w.HTMLAnchorElement.prototype.click=()=>{};}});
- const w=dom.window,d=w.document;await until(()=>d.querySelector('[data-node="ip:1"]'));
+ const w=dom.window,d=w.document;d.querySelector("#control-token").value="1".repeat(64);d.querySelector("#control-unlock").dispatchEvent(new w.Event("submit",{cancelable:true}));await until(()=>d.querySelector('[data-node="ip:1"]'));
  d.querySelector('[data-view="research"]').click();await until(()=>d.querySelector('#research-target option[value="1"]'));
  d.querySelector('#research-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await until(()=>d.querySelector('#research-status').textContent.startsWith('Analysis complete'));
  assert.match(d.querySelector('#research-results').textContent,/1 accepted samples/);assert.match(d.querySelector('#research-results').textContent,/ARM64/);

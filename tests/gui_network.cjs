@@ -11,7 +11,7 @@ async function until(check) {
   throw Error("Network GUI state did not update");
 }
 (async () => {
-  const baseline = await (await fetch(base + "/api/v2/overview")).json();
+  const baseline = await (await fetch(base + "/api/v2/overview", {headers:{"X-Atlas-Control":"1".repeat(64)}})).json();
   const contexts = {
     A: {
       id: "A",
@@ -106,6 +106,8 @@ async function until(check) {
   });
   const w = dom.window,
     d = w.document;
+  d.querySelector("#control-token").value="1".repeat(64);
+  d.querySelector("#control-unlock").dispatchEvent(new w.Event("submit",{cancelable:true}));
   await until(() => d.querySelector('[data-node="ip:1"]'));
   mocking = true;
   d.querySelector("#map-refresh").click();

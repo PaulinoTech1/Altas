@@ -13,6 +13,12 @@
       <a href="/" class="brand">ATLAS <span>/ NETWORK OBSERVATORY</span></a
       ><span id="status" role="status">Connecting…</span>
     </header>
+    <form id="control-unlock" class="panel">
+      <label>Local control token <input id="control-token" type="password" autocomplete="off" required minlength="64" maxlength="64" aria-describedby="control-help"></label>
+      <button type="submit">Unlock dashboard</button>
+      <p id="control-help">Enter the token printed at Atlas startup. It stays in this page's memory. A restart changes a generated token.</p>
+      <p id="control-error" role="alert"></p>
+    </form>
     <main>
       <section class="intro">
         <div>

@@ -14,16 +14,37 @@
       this.requestId = requestId;
     }
   }
+  let controlToken = "";
+  const form = typeof document === "undefined" ? null : document.querySelector("#control-unlock");
+  let unlock;
+  const ready = form ? new Promise(resolve => { unlock = resolve; }) : Promise.resolve();
+  if (form) form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const value = document.querySelector("#control-token").value;
+    try {
+      const response = await fetch("/api/control/unlock", {method:"POST", headers:{"Content-Type":"application/json", "X-Atlas-Control":value}, body:"{}"});
+      if (!response.ok) {
+        const result = await response.json();
+        document.querySelector("#control-error").textContent = result.error_code || "ATLAS_CONTROL_AUTH_INVALID";
+        return;
+      }
+      controlToken=value;
+      document.querySelector("#control-token").value="";
+      form.hidden=true;
+      unlock();
+    } catch (_) { document.querySelector("#control-error").textContent="ATLAS_NETWORK_UNAVAILABLE"; }
+  });
   async function request(path, data) {
+    await ready;
     let response;
     try {
       response = await fetch(
         path,
         data === undefined
-          ? {}
+          ? {headers:{"X-Atlas-Control":controlToken}}
           : {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "X-Atlas-Control":controlToken },
               body: JSON.stringify(data),
             },
       );
@@ -80,5 +101,17 @@
       lines.push(`Details: ${JSON.stringify(error.details)}`);
     return lines.join("\n");
   }
+  if (typeof document !== "undefined") document.addEventListener("click", async event => {
+    const link=event.target.closest("a[href='/api/backup']");
+    if (!link) return;
+    event.preventDefault();
+    await ready;
+    try {
+      const response=await fetch("/api/backup",{headers:{"X-Atlas-Control":controlToken}});
+      if(!response.ok) { const result=await response.json(); throw Error(result.error_code); }
+      const url=URL.createObjectURL(await response.blob());
+      const a=document.createElement("a");a.href=url;a.download="atlas-backup.sqlite3";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    } catch(error) { const box=document.querySelector("#error"); if(box) box.textContent=error.message; }
+  });
   window.AtlasAPI = { request, describe, AtlasFailure };
 })();

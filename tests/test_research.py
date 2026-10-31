@@ -198,12 +198,17 @@ class ResearchHttpTests(unittest.TestCase):
                 c.request(
                     "GET",
                     "/api/v2/research?dataset=network&target_id=1&port=80&window=8&threshold_ms=10",
+                    headers={"X-Atlas-Control": app.control_token},
                 )
                 r = c.getresponse()
                 body = json.loads(r.read())
                 self.assertEqual(r.status, 200)
                 self.assertEqual(body["signal"]["samples"], 0)
-                c.request("GET", "/api/v2/research_benchmark")
+                c.request(
+                    "GET",
+                    "/api/v2/research_benchmark",
+                    headers={"X-Atlas-Control": app.control_token},
+                )
                 r = c.getresponse()
                 r.read()
                 self.assertEqual(r.status, 405)
@@ -211,7 +216,10 @@ class ResearchHttpTests(unittest.TestCase):
                     "POST",
                     "/api/v2/research_benchmark",
                     "{}",
-                    {"Content-Type": "application/json"},
+                    {
+                        "Content-Type": "application/json",
+                        "X-Atlas-Control": app.control_token,
+                    },
                 )
                 r = c.getresponse()
                 body = json.loads(r.read())

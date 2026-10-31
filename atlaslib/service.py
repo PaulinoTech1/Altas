@@ -7,6 +7,8 @@ import errno
 import http.client
 import ipaddress
 import json
+import os
+import secrets
 import re
 import socket
 import sqlite3
@@ -31,6 +33,12 @@ def now():
 class Atlas:
 
     def __init__(self, database, interval=300, timeout=1.5, discovery_interval=300):
+        configured = os.environ.get("ATLAS_CONTROL_TOKEN")
+        if configured is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", configured):
+            raise AtlasError("ATLAS_CONTROL_TOKEN_INVALID")
+        self.control_token = (
+            configured if configured is not None else secrets.token_hex(32)
+        )
         self.database, self.interval, self.timeout = (str(database), interval, timeout)
         self.lock = threading.Lock()
         self.discovery_lock = threading.Lock()
