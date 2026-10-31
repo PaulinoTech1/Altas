@@ -1,0 +1,282 @@
+{
+  "ATLAS_INPUT_INVALID": {
+    "status": 400,
+    "category": "validation",
+    "retryable": false,
+    "summary": "An input value is invalid.",
+    "action": "Correct the indicated input and submit again."
+  },
+  "ATLAS_JSON_INVALID": {
+    "status": 400,
+    "category": "validation",
+    "retryable": false,
+    "summary": "The request is not valid UTF-8 JSON.",
+    "action": "Send a JSON object encoded as UTF-8."
+  },
+  "ATLAS_LENGTH_REQUIRED": {
+    "status": 411,
+    "category": "protocol",
+    "retryable": false,
+    "summary": "The request has no Content-Length.",
+    "action": "Send a Content-Length header with the JSON request."
+  },
+  "ATLAS_BODY_TOO_LARGE": {
+    "status": 413,
+    "category": "capacity",
+    "retryable": false,
+    "summary": "The request exceeds the size limit.",
+    "action": "Split or reduce the request; inspect the documented limits."
+  },
+  "ATLAS_MEDIA_UNSUPPORTED": {
+    "status": 415,
+    "category": "protocol",
+    "retryable": false,
+    "summary": "The request content type is unsupported.",
+    "action": "Send Content-Type: application/json."
+  },
+  "ATLAS_ORIGIN_REJECTED": {
+    "status": 403,
+    "category": "authorization",
+    "retryable": false,
+    "summary": "The browser origin is not allowed.",
+    "action": "Use the dashboard served by this Atlas instance."
+  },
+  "ATLAS_NOT_FOUND": {
+    "status": 404,
+    "category": "validation",
+    "retryable": false,
+    "summary": "The requested resource does not exist.",
+    "action": "Refresh the inventory or sessions and select an existing resource."
+  },
+  "ATLAS_METHOD_NOT_ALLOWED": {
+    "status": 405,
+    "category": "protocol",
+    "retryable": false,
+    "summary": "This operation does not support that HTTP method.",
+    "action": "Use the method documented for the operation."
+  },
+  "ATLAS_CONFLICT": {
+    "status": 409,
+    "category": "conflict",
+    "retryable": false,
+    "summary": "The requested change conflicts with existing data.",
+    "action": "Use the existing resource or choose a distinct identifier."
+  },
+  "ATLAS_JOB_BUSY": {
+    "status": 409,
+    "category": "capacity",
+    "retryable": true,
+    "summary": "This collector is already running.",
+    "action": "Wait for the current collection run to finish."
+  },
+  "ATLAS_WORKER_START_FAILED": {
+    "status": 503,
+    "category": "dependency",
+    "retryable": true,
+    "summary": "A collection worker could not start.",
+    "action": "Check process resources and retry after other jobs finish."
+  },
+  "ATLAS_ENGINE_MISSING": {
+    "status": 503,
+    "category": "dependency",
+    "retryable": false,
+    "summary": "The native capture engine is missing.",
+    "action": "Run cargo build --release --locked in native/."
+  },
+  "ATLAS_ENGINE_BUSY": {
+    "status": 503,
+    "category": "capacity",
+    "retryable": true,
+    "summary": "The native engine has no available execution slot.",
+    "action": "Wait briefly before retrying; do not start parallel retries."
+  },
+  "ATLAS_ENGINE_TIMEOUT": {
+    "status": 504,
+    "category": "timeout",
+    "retryable": true,
+    "summary": "The native operation exceeded its deadline.",
+    "action": "Inspect whether the operation committed before retrying. Reuse capture identity; do not blindly resubmit sensor batches."
+  },
+  "ATLAS_ENGINE_START_FAILED": {
+    "status": 503,
+    "category": "dependency",
+    "retryable": false,
+    "summary": "The native executable could not start.",
+    "action": "Check executable permissions, architecture and runtime libraries."
+  },
+  "ATLAS_ENGINE_PROTOCOL": {
+    "status": 502,
+    "category": "dependency",
+    "retryable": false,
+    "summary": "The native engine returned an invalid response.",
+    "action": "Rebuild the native engine and restart Atlas; retain the request ID."
+  },
+  "ATLAS_ENGINE_CRASHED": {
+    "status": 502,
+    "category": "dependency",
+    "retryable": false,
+    "summary": "The native engine exited unexpectedly.",
+    "action": "Inspect server diagnostics with the request ID; rebuild before retrying."
+  },
+  "ATLAS_STORAGE_BUSY": {
+    "status": 503,
+    "category": "storage",
+    "retryable": true,
+    "summary": "The database is busy.",
+    "action": "Wait for the current writer, then retry with backoff."
+  },
+  "ATLAS_STORAGE_FULL": {
+    "status": 507,
+    "category": "storage",
+    "retryable": false,
+    "summary": "The database cannot grow because storage is full.",
+    "action": "Free storage before retrying; do not delete the active database."
+  },
+  "ATLAS_STORAGE_CORRUPT": {
+    "status": 500,
+    "category": "storage",
+    "retryable": false,
+    "summary": "The database is corrupt or is not a SQLite database.",
+    "action": "Stop collection and restore a verified backup; retain the damaged file."
+  },
+  "ATLAS_STORAGE_FAILURE": {
+    "status": 500,
+    "category": "storage",
+    "retryable": false,
+    "summary": "A database operation failed.",
+    "action": "Check database permissions and server diagnostics before retrying."
+  },
+  "ATLAS_AUTH_INVALID": {
+    "status": 401,
+    "category": "authorization",
+    "retryable": false,
+    "summary": "The sensor credential is missing, invalid or revoked.",
+    "action": "Create an enabled sensor credential and send it as a Bearer token."
+  },
+  "ATLAS_CAPTURE_EMPTY": {
+    "status": 422,
+    "category": "validation",
+    "retryable": false,
+    "summary": "No supported scan packets were found.",
+    "action": "Provide Nordic scan lines: TIME ADDRESS RSSI HEXDATA."
+  },
+  "ATLAS_SESSION_CONFLICT": {
+    "status": 409,
+    "category": "conflict",
+    "retryable": false,
+    "summary": "The session key is already assigned to different capture content.",
+    "action": "Reuse the original content or choose a new session key."
+  },
+  "ATLAS_WIFI_UNAVAILABLE": {
+    "status": 503,
+    "category": "capability",
+    "retryable": false,
+    "summary": "The Wi-Fi IPv4 interface is unavailable.",
+    "action": "Connect the phone to Wi-Fi and check Android permissions."
+  },
+  "ATLAS_SCOPE_UNSUPPORTED": {
+    "status": 422,
+    "category": "capability",
+    "retryable": false,
+    "summary": "The Wi-Fi subnet is outside supported discovery bounds.",
+    "action": "Use a private IPv4 subnet containing at most 256 addresses."
+  },
+  "ATLAS_DNS_FAILED": {
+    "status": 200,
+    "category": "observation",
+    "retryable": true,
+    "summary": "Name resolution did not return an address.",
+    "action": "Check the hostname and resolver; this does not prove a device is offline."
+  },
+  "ATLAS_TCP_REFUSED": {
+    "status": 200,
+    "category": "observation",
+    "retryable": false,
+    "summary": "The selected TCP connection was refused.",
+    "action": "Review selected services; a refusal is response evidence, not a device identity."
+  },
+  "ATLAS_TCP_TIMEOUT": {
+    "status": 200,
+    "category": "observation",
+    "retryable": true,
+    "summary": "The selected TCP connection timed out.",
+    "action": "Check connectivity or filtering; do not infer that the device is powered off."
+  },
+  "ATLAS_TCP_UNREACHABLE": {
+    "status": 200,
+    "category": "observation",
+    "retryable": true,
+    "summary": "The selected TCP connection could not be established.",
+    "action": "Check routing, permissions and the selected service."
+  },
+  "ATLAS_METADATA_FAILED": {
+    "status": 200,
+    "category": "observation",
+    "retryable": true,
+    "summary": "The service answered but metadata collection failed.",
+    "action": "Inspect the service protocol; the successful TCP observation remains valid."
+  },
+  "ATLAS_COLLECTOR_FAILED": {
+    "status": 500,
+    "category": "collection",
+    "retryable": false,
+    "summary": "A collection run failed.",
+    "action": "Inspect collection health and server diagnostics; completed observations are retained."
+  },
+  "ATLAS_IO_FAILED": {
+    "status": 500,
+    "category": "storage",
+    "retryable": false,
+    "summary": "A required local file could not be accessed.",
+    "action": "Check file permissions and availability; consult server diagnostics."
+  },
+  "ATLAS_INTERNAL": {
+    "status": 500,
+    "category": "internal",
+    "retryable": false,
+    "summary": "An unexpected application failure occurred.",
+    "action": "Retain the request ID and inspect server diagnostics before retrying."
+  },
+  "ATLAS_RESPONSE_INVALID": {
+    "status": 502,
+    "category": "protocol",
+    "retryable": false,
+    "summary": "The server returned an invalid response.",
+    "action": "Check the localhost connection and server diagnostics."
+  },
+  "ATLAS_LIMIT_REACHED": {
+    "status": 422,
+    "category": "capacity",
+    "retryable": false,
+    "summary": "The configured resource limit has been reached.",
+    "action": "Use an existing resource or reduce the requested resource count."
+  },
+  "ATLAS_NETWORK_UNAVAILABLE": {
+    "status": 503,
+    "category": "connection",
+    "retryable": true,
+    "summary": "The localhost server could not be reached.",
+    "action": "Check that Atlas is running, then retry once the connection is restored."
+  },
+  "ATLAS_WIFI_API_UNAVAILABLE": {
+    "status": 200,
+    "category": "capability",
+    "retryable": false,
+    "summary": "Android Wi-Fi API information is unavailable.",
+    "action": "Check Termux:API installation and Android permissions; TCP observation can continue."
+  },
+  "ATLAS_BIND_FAILED": {
+    "status": 503,
+    "category": "dependency",
+    "retryable": false,
+    "summary": "The localhost server could not bind its listening socket.",
+    "action": "Check whether another process owns the port, or choose a different --port."
+  },
+  "ATLAS_NETWORK_CHANGED": {
+    "status": 409,
+    "category": "collection",
+    "retryable": true,
+    "summary": "The active network changed during the operation.",
+    "action": "Wait for discovery on the current network, then retry the operation."
+  }
+}

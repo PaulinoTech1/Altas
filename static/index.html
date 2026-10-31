@@ -1,1 +1,679 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas · Network observatory</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><body><header><a href="/" class="brand">ATLAS <span>/ NETWORK OBSERVATORY</span></a><span id="status" role="status">Connecting…</span></header><main><section class="intro"><div><p class="eyebrow">YOUR NETWORK, OVER TIME</p><h1>Know what changed.</h1><p>Observe reachable services. Build a history. Follow the evidence.</p></div><button id="scan">Observe now</button></section><p id="error" role="alert" hidden></p><section id="metrics" aria-label="Network summary"></section><div class="layout"><section><section class="panel"><h2>Find devices on Wi-Fi</h2><p id="network">Checking Wi-Fi interface…</p><button id="discover">Discover local devices</button><p id="discovery-status" role="status"></p><p class="hint">Checks common TCP ports on your current Wi-Fi subnet. Responding addresses are added automatically. Silent devices may not appear.</p></section><section class="panel"><h2>Device intelligence</h2><button id="enrich">Collect names & advertisements</button><p id="enrichment-status" role="status"></p><p id="ssid-info" class="hint"></p></section><h2>Monitored devices</h2><label>Search devices and evidence<input id="search" type="search" placeholder="IP, name, service, certificate…"></label><div class="controls"><label>Show<select id="filter"><option value="all">All devices</option><option value="responding">Responding</option><option value="no_response">No TCP response</option><option value="paused">Paused</option></select></label><label>Sort<select id="sort"><option value="ip">IP address</option><option value="name">Device name</option><option value="services">Open services</option><option value="response">Response rate</option></select></label></div><p id="result-count" class="hint"></p><div id="devices" aria-live="polite"></div><details class="panel"><summary>Add a device</summary><form id="add"><label>Device name<input name="label" placeholder="Living room receiver" maxlength="100"></label><label>IP address or hostname<input name="host" placeholder="192.168.1.20" required autocapitalize="none" spellcheck="false"></label><label>TCP ports, separated by commas<input name="ports" value="22,80,443,1883,8000,8080,8443" required></label><p class="hint">Add devices you own or have permission to monitor. Only the listed ports are checked.</p><button>Add device</button></form></details><section class="panel"><h2>Observation history</h2><label>Device<select id="history-target"><option value="">Select a device</option></select></label><div id="history">Select a device to inspect its last 200 observations.</div></section></section><aside><section class="panel"><h2>Capture workbench</h2><p id="capture-engine" class="hint"></p><label>Capture device<select id="capture-target"><option value="">Select imported device</option></select></label><button id="capture-load">Load signal history</button><p id="capture-summary" role="status">Import a log to explore its observations.</p><svg id="capture-chart" viewBox="0 0 600 180" role="img" aria-label="Imported Bluetooth signal strength over source time"></svg><label>Replay observation<input id="capture-replay" type="range" min="0" max="0" value="0" disabled></label><p id="capture-position"></p><button id="capture-play" disabled>Play replay</button><p class="hint">Last 2,000 samples per device. Source clocks have no date; midnight and multiple-day ordering can be ambiguous. RSSI is not a reliable distance measurement.</p><h3>Import Bluetooth observations</h3><p class="hint">nRF Connect must export observations first. This is imported evidence, not live scanning. Save supported scan logs in Download/AtlasBridge, then import below.</p><button id="ble-folder">Import shared folder</button><label>Upload scan log<input type="file" id="ble-file" accept=".txt,.log,.csv,text/plain"></label><details><summary>Paste scan log</summary><label>Nordic scan lines<textarea id="ble-text" placeholder="TIME ADDRESS RSSI HEXDATA"></textarea></label><button id="ble-paste">Import pasted log</button></details><p id="ble-result" role="status"></p><div id="ble-devices"></div></section><section class="panel"><h2>24-hour briefing</h2><div id="briefing">Waiting for observations.</div></section><section class="panel"><h2>Change log</h2><ol id="events"></ol></section><p class="hint">No response means none of the selected TCP ports answered. A device may still be online. Atlas observes IP services; radio hardware is not required.</p><button id="export" class="secondary">Export current inventory & changes</button><p><a class="download" href="/api/backup">Download full database backup</a></p></aside></div></main><footer>LOCAL FIRST · SQLITE HISTORY · <span id="interval"></span></footer></body></html>
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Atlas · Network observatory</title
+  ><link rel="stylesheet" href="/style.css" />
+  <script src="/api-client.js" defer></script>
+  <script src="/app.js" defer></script>
+  <script src="/investigate.js" defer></script>
+  <body>
+    <header>
+      <a href="/" class="brand">ATLAS <span>/ NETWORK OBSERVATORY</span></a
+      ><span id="status" role="status">Connecting…</span>
+    </header>
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">YOUR NETWORK, OVER TIME</p>
+          <h1>Know what changed.</h1>
+          <p>
+            Observe reachable services. Build a history. Follow the evidence.
+          </p>
+        </div>
+        <button id="scan">Observe now</button>
+      </section>
+      <p id="error" role="alert" hidden></p>
+      <section id="metrics" aria-label="Network summary"></section>
+      <nav class="workspace-nav" aria-label="Atlas workspaces">
+        <button class="tab" data-view="research" aria-pressed="false">
+          Research lab
+        </button>
+        <button class="tab active" data-view="map" aria-pressed="true">
+          Network map</button
+        ><button class="tab" data-view="captures" aria-pressed="false">
+          Capture lab</button
+        ><button class="tab" data-view="alerts" aria-pressed="false">
+          Alerts</button
+        ><button class="tab" data-view="sensors" aria-pressed="false">
+          Sensors</button
+        ><button class="tab" data-view="health" aria-pressed="false">
+          Collection health</button
+        ><button class="tab" data-view="inventory" aria-pressed="false">
+          Inventory
+        </button>
+      </nav>
+      <section id="map-view" class="workspace">
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">OBSERVED CONNECTIONS</p>
+            <h2>Your network, in view.</h2>
+          </div>
+          <button id="map-refresh" class="secondary">Refresh map</button>
+        </div>
+        <p class="hint">
+          Lines connect observers to evidence. They do not describe physical
+          topology, traffic between devices, or SSID membership. BLE and IP
+          identities remain separate.
+        </p>
+        <p id="map-network-status" role="status" class="hint"></p>
+        <div class="map-toolbar">
+          <label
+            >Network context<select id="map-network">
+              <option value="active">Current Wi-Fi</option>
+            </select></label
+          >
+          <button id="map-discover" class="secondary">
+            Discover this network
+          </button>
+          <button id="map-network-reset" class="secondary">
+            Start fresh network context
+          </button>
+        </div>
+        <p class="hint">
+          SSID access is restricted here. If two networks expose identical
+          address/subnet information, use Start fresh network context after
+          switching.
+        </p>
+        <div class="map-toolbar">
+          <label
+            >Find a node<input
+              id="map-search"
+              type="search"
+              placeholder="Address, name, model, service…" /></label
+          ><label
+            >Show<select id="map-kind">
+              <option value="all">All observations</option>
+              <option value="ip">IP devices</option>
+              <option value="ble">BLE observations</option>
+            </select></label
+          ><button
+            id="map-zoom-out"
+            class="secondary"
+            aria-label="Zoom map out"
+          >
+            −</button
+          ><button id="map-zoom-in" class="secondary" aria-label="Zoom map in">
+            +</button
+          ><button id="map-reset" class="secondary">Fit map</button>
+        </div>
+        <div class="map-layout">
+          <div>
+            <div id="map-canvas">
+              <svg
+                id="network-map"
+                viewBox="0 0 1100 700"
+                role="group"
+                aria-label="Interactive Atlas network observation map"
+              ></svg>
+            </div>
+            <div class="map-legend">
+              <span>● TCP responding</span><span>◇ No response / unknown</span
+              ><span>○ Imported BLE</span><span>□ Observer</span>
+            </div>
+            <p id="map-count" class="hint" role="status"></p>
+            <div class="pager">
+              <button id="map-prev" class="secondary">Previous nodes</button
+              ><button id="map-next" class="secondary">Next nodes</button>
+            </div>
+          </div>
+          <aside class="panel node-inspector">
+            <h3 id="node-title">Inspect a device</h3>
+            <p id="node-summary">
+              Select a map node using touch, mouse, or keyboard. Drag the map to
+              pan.
+            </p>
+            <div id="node-actions"></div>
+            <div id="node-evidence"></div>
+            <h3>Identity timeline</h3>
+            <div id="node-timeline">
+              <p class="hint">
+                Observed changes appear here. Device-provided identities are
+                unverified.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <section id="captures-view" class="workspace" hidden>
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">OFFLINE INVESTIGATION</p>
+            <h2>Capture lab</h2>
+          </div>
+          <button id="sessions-refresh" class="secondary">
+            Refresh sessions
+          </button>
+        </div>
+        <div class="investigation-grid">
+          <section class="panel">
+            <h3>Start a capture session</h3>
+            <label
+              >Session name<input
+                id="session-name"
+                maxlength="160"
+                placeholder="Evening room survey" /></label
+            ><label
+              >Session identity<select id="session-policy">
+                <option value="dedup">Reuse exact-file imports</option>
+                <option value="new">
+                  Create a distinct session for this import
+                </option>
+              </select></label
+            ><label
+              >Nordic scan export<input
+                id="session-file"
+                type="file"
+                accept=".txt,.log,.csv,text/plain"
+            /></label>
+            <details>
+              <summary>Paste supported scan lines</summary>
+              <label
+                >Scan text<textarea
+                  id="session-text"
+                  placeholder="12:34:56.123 AA:BB:CC:DD:EE:FF -45 020106"
+                ></textarea></label
+              ><button id="session-paste">Import session</button>
+            </details>
+            <p id="session-import-result" role="status"></p>
+            <p class="hint">
+              Original source is retained in SQLite. Up to 1 MB and 10,000
+              packets per import. Exact reimports reuse a session unless you
+              explicitly choose a distinct one.
+            </p>
+          </section>
+          <section class="panel">
+            <h3>Compare two sessions</h3>
+            <label>Earlier session<select id="compare-a"></select></label
+            ><label>Later session<select id="compare-b"></select></label
+            ><button id="compare-run">Compare addresses & signal</button>
+            <div id="compare-result" role="status"></div>
+          </section>
+        </div>
+        <label
+          >Active session<select id="session-select">
+            <option value="0">All sessions</option>
+          </select></label
+        >
+        <div id="session-info"></div>
+        <div class="actions">
+          <button id="session-source" class="secondary">
+            Download original log</button
+          ><button id="session-report" class="secondary">
+            Download session report
+          </button>
+        </div>
+        <section class="panel">
+          <h3>Packet explorer</h3>
+          <form id="packet-form">
+            <div class="map-toolbar">
+              <label
+                >Search packet fields<input
+                  id="packet-query"
+                  type="search"
+                  placeholder="Name, UUID, manufacturer ID, hex…" /></label
+              ><label
+                >BLE address<input
+                  id="packet-address"
+                  placeholder="Optional exact address"
+                  maxlength="17" /></label
+              ><label
+                >Minimum RSSI<input
+                  id="packet-rssi"
+                  type="number"
+                  min="-127"
+                  max="20"
+                  value="-127" /></label
+              ><button>Search packets</button>
+            </div>
+          </form>
+          <p id="packet-count" role="status"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sequence / session</th>
+                  <th>Clock / elapsed</th>
+                  <th>Device</th>
+                  <th>RSSI</th>
+                  <th>Advertisement</th>
+                </tr>
+              </thead>
+              <tbody id="packet-rows"></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <button id="packet-reset" class="secondary">Newest page</button
+            ><button id="packet-next" class="secondary">Older packets</button>
+          </div>
+        </section>
+        <section class="panel">
+          <h3>Replay this session</h3>
+          <button id="session-replay-load" class="secondary">
+            Load replay
+          </button>
+          <p id="session-replay-note" class="hint">
+            Select a session. Replay uses packet sequence and detects large
+            clock rollovers; absolute dates remain unknown.
+          </p>
+          <svg
+            id="session-chart"
+            viewBox="0 0 900 220"
+            role="img"
+            aria-label="Capture session RSSI chart"
+          ></svg
+          ><label
+            >Observation<input
+              id="session-slider"
+              type="range"
+              min="0"
+              max="0"
+              value="0"
+              disabled /></label
+          ><button id="session-play" disabled>Play</button>
+          <p id="session-position" role="status"></p>
+        </section>
+      </section>
+      <section id="research-view" class="workspace" hidden>
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">REPRODUCIBLE EXPLORATION</p>
+            <h2>Assembly research lab</h2>
+          </div>
+          <button id="research-refresh" class="secondary">
+            Refresh sources
+          </button>
+        </div>
+        <p>
+          Five local ARM64 kernels measure signal moments, RSSI distributions,
+          sliding-window sums, dot products and payload bit changes. Rust
+          validates inputs and interprets the measurements. No radio permissions
+          or additional probes are used.
+        </p>
+        <form id="research-form" class="panel">
+          <div class="controls">
+            <label
+              >Dataset<select id="research-dataset">
+                <option value="network">Recorded TCP connect timings</option>
+                <option value="ble">Imported BLE capture</option>
+              </select></label
+            ><label
+              >Window size (samples)<input
+                id="research-window"
+                type="number"
+                value="16"
+                min="4"
+                max="256"
+                required
+            /></label>
+          </div>
+          <div id="research-network-fields">
+            <label
+              >Network context<select id="research-network"></select
+            ></label>
+            <div class="controls">
+              <label
+                >Monitored target<select id="research-target"></select></label
+              ><label
+                >TCP port<input
+                  id="research-port"
+                  type="number"
+                  value="80"
+                  min="1"
+                  max="65535"
+              /></label>
+            </div>
+            <label
+              >Candidate shift threshold (ms)<input
+                id="research-threshold-ms"
+                type="number"
+                min="1"
+                max="1000"
+                value="10"
+            /></label>
+            <p class="hint">
+              Analyze one port on one target. Historical network contexts are
+              available. Successful recorded TCP timings only; samples are
+              quantized to 0.1 ms, and values outside 0–3276.7 ms are excluded.
+            </p>
+          </div>
+          <div id="research-ble-fields" hidden>
+            <label
+              >Capture session<select id="research-session"></select
+            ></label>
+            <div class="controls">
+              <label
+                >Exact BLE address (optional)<input
+                  id="research-address"
+                  placeholder="All addresses, analyzed separately"
+                  maxlength="17" /></label
+              ><label
+                >Candidate shift threshold (dB)<input
+                  id="research-threshold-db"
+                  type="number"
+                  min="1"
+                  max="60"
+                  value="6"
+              /></label>
+            </div>
+            <p class="hint">
+              Up to 10,000 packets and 64 addresses. RSSI is not a calibrated
+              distance measurement. Packet-order correlation is not fixed-time
+              correlation.
+            </p>
+          </div>
+          <button id="research-run">Analyze stored evidence</button>
+          <p id="research-status" role="status">
+            Choose a source. No synthetic observations are inserted into your
+            database.
+          </p>
+        </form>
+        <div class="actions">
+          <button id="research-json" class="secondary" disabled>
+            Export analysis JSON</button
+          ><button id="research-html" class="secondary" disabled>
+            Download research notebook
+          </button>
+        </div>
+        <div id="research-results"></div>
+        <section class="panel">
+          <h3>Kernel microbenchmark</h3>
+          <p class="hint">
+            Compare the assembly kernels with optimized Rust references on this
+            phone. Five warmed batches, 100 calls per batch. This measures the
+            kernels, not whole-app performance. Ratios below 1 mean the assembly
+            was slower.
+          </p>
+          <button id="research-benchmark" class="secondary">
+            Benchmark kernels
+          </button>
+          <div id="research-benchmark-result" role="status"></div>
+        </section>
+      </section>
+
+      <section id="alerts-view" class="workspace" hidden>
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">CHANGES WORTH INVESTIGATING</p>
+            <h2>Local alerts</h2>
+          </div>
+          <button id="alerts-refresh" class="secondary">Refresh alerts</button>
+        </div>
+        <p class="hint">
+          Atlas checks for alerts after collection runs and when the map or
+          alert feed refreshes. These are local records; background Android
+          notifications are not enabled.
+        </p>
+        <form id="rules-form" class="panel">
+          <h3>Alert rules</h3>
+          <label class="check"
+            ><input id="rules-enabled" type="checkbox" checked /> Generate
+            alerts</label
+          >
+          <div class="controls">
+            <label
+              >Consecutive missed checks<input
+                id="rules-missed"
+                type="number"
+                min="1"
+                max="20"
+                value="3" /></label
+            ><label
+              >Stale observation after minutes<input
+                id="rules-stale"
+                type="number"
+                min="5"
+                max="1440"
+                value="30"
+            /></label>
+          </div>
+          <button>Save rules</button>
+          <p id="rules-result" role="status"></p>
+        </form>
+        <div id="alert-list"></div>
+      </section>
+      <section id="sensors-view" class="workspace" hidden>
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">BRING YOUR OWN OBSERVER</p>
+            <h2>Sensor gateway</h2>
+          </div>
+        </div>
+        <p>
+          Receive BLE scan logs or IP service observations from a companion. The
+          server stays on localhost; a remote sensor needs an authenticated
+          tunnel to this phone.
+        </p>
+        <form id="sensor-form" class="panel">
+          <label
+            >Sensor name<input
+              id="sensor-name"
+              required
+              maxlength="100"
+              placeholder="Desk Raspberry Pi" /></label
+          ><button>Create sensor credential</button>
+          <div id="sensor-created" role="status"></div>
+        </form>
+        <div id="sensor-list"></div>
+        <details class="panel">
+          <summary>Ingestion format</summary>
+          <p>
+            POST JSON to <code>/api/v2/ingest</code> with
+            <code>Authorization: Bearer TOKEN</code>. BLE payload:
+            <code
+              >{"source":"sensor.log","text":"TIME ADDRESS RSSI HEXDATA"}</code
+            >. IP payload:
+          </p>
+          <pre>
+{"observations":[{"host":"192.168.1.20","status":"responding","services":[{"port":80,"state":"open"}]}]}</pre>
+          <p class="hint">
+            Sensor reports retain separate provenance and never overwrite local
+            scan results. Revoking a credential stops new submissions.
+          </p>
+        </details>
+      </section>
+      <section id="health-view" class="workspace" hidden>
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">THE OBSERVER ITSELF</p>
+            <h2>Collection health</h2>
+          </div>
+          <button id="health-refresh" class="secondary">Refresh health</button>
+        </div>
+        <div id="health-summary" class="investigation-grid"></div>
+        <section class="panel">
+          <h3>Recent collection runs</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Collector</th>
+                  <th>Finished</th>
+                  <th>Duration</th>
+                  <th>Items</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody id="health-runs"></tbody>
+            </table>
+          </div>
+        </section>
+        <div class="actions">
+          <button id="inventory-report" class="secondary">
+            Download inventory report</button
+          ><a class="download" href="/api/backup"
+            >Download full database backup</a
+          >
+        </div>
+      </section>
+      <div id="inventory-view" class="layout workspace" hidden>
+        <section>
+          <section class="panel">
+            <h2>Find devices on Wi-Fi</h2>
+            <p id="network">Checking Wi-Fi interface…</p>
+            <button id="discover">Discover local devices</button>
+            <p id="discovery-status" role="status"></p>
+            <p class="hint">
+              Checks common TCP ports on your current Wi-Fi subnet. Responding
+              addresses are added automatically. Silent devices may not appear.
+            </p>
+          </section>
+          <section class="panel">
+            <h2>Device intelligence</h2>
+            <button id="enrich">Collect names & advertisements</button>
+            <p id="enrichment-status" role="status"></p>
+            <p id="ssid-info" class="hint"></p>
+          </section>
+          <h2>Monitored devices</h2>
+          <label
+            >Search devices and evidence<input
+              id="search"
+              type="search"
+              placeholder="IP, name, service, certificate…"
+          /></label>
+          <div class="controls">
+            <label
+              >Show<select id="filter">
+                <option value="all">All devices</option>
+                <option value="responding">Responding</option>
+                <option value="no_response">No TCP response</option>
+                <option value="paused">Paused</option>
+              </select></label
+            ><label
+              >Sort<select id="sort">
+                <option value="ip">IP address</option>
+                <option value="name">Device name</option>
+                <option value="services">Open services</option>
+                <option value="response">Response rate</option>
+              </select></label
+            >
+          </div>
+          <p id="result-count" class="hint"></p>
+          <div id="devices" aria-live="polite"></div>
+          <details class="panel">
+            <summary>Add a device</summary>
+            <form id="add">
+              <label
+                >Device name<input
+                  name="label"
+                  placeholder="Living room receiver"
+                  maxlength="100" /></label
+              ><label
+                >IP address or hostname<input
+                  name="host"
+                  placeholder="192.168.1.20"
+                  required
+                  autocapitalize="none"
+                  spellcheck="false" /></label
+              ><label
+                >TCP ports, separated by commas<input
+                  name="ports"
+                  value="22,80,443,1883,8000,8080,8443"
+                  required
+              /></label>
+              <p class="hint">
+                Add devices you own or have permission to monitor. Only the
+                listed ports are checked.
+              </p>
+              <button>Add device</button>
+            </form>
+          </details>
+          <section class="panel">
+            <h2>Observation history</h2>
+            <label
+              >Device<select id="history-target">
+                <option value="">Select a device</option>
+              </select></label
+            >
+            <div id="history">
+              Select a device to inspect its last 200 observations.
+            </div>
+          </section>
+        </section>
+        <aside>
+          <section class="panel">
+            <h2>Capture workbench</h2>
+            <p id="capture-engine" class="hint"></p>
+            <label
+              >Capture device<select id="capture-target">
+                <option value="">Select imported device</option>
+              </select></label
+            ><button id="capture-load">Load signal history</button>
+            <p id="capture-summary" role="status">
+              Import a log to explore its observations.
+            </p>
+            <svg
+              id="capture-chart"
+              viewBox="0 0 600 180"
+              role="img"
+              aria-label="Imported Bluetooth signal strength over source time"
+            ></svg
+            ><label
+              >Replay observation<input
+                id="capture-replay"
+                type="range"
+                min="0"
+                max="0"
+                value="0"
+                disabled
+            /></label>
+            <p id="capture-position"></p>
+            <button id="capture-play" disabled>Play replay</button>
+            <p class="hint">
+              Last 2,000 samples per device. Source clocks have no date;
+              midnight and multiple-day ordering can be ambiguous. RSSI is not a
+              reliable distance measurement.
+            </p>
+            <h3>Import Bluetooth observations</h3>
+            <p class="hint">
+              nRF Connect must export observations first. This is imported
+              evidence, not live scanning. Save supported scan logs in
+              Download/AtlasBridge, then import below.
+            </p>
+            <button id="ble-folder">Import shared folder</button
+            ><label
+              >Upload scan log<input
+                type="file"
+                id="ble-file"
+                accept=".txt,.log,.csv,text/plain"
+            /></label>
+            <details>
+              <summary>Paste scan log</summary>
+              <label
+                >Nordic scan lines<textarea
+                  id="ble-text"
+                  placeholder="TIME ADDRESS RSSI HEXDATA"
+                ></textarea></label
+              ><button id="ble-paste">Import pasted log</button>
+            </details>
+            <p id="ble-result" role="status"></p>
+            <div id="ble-devices"></div>
+          </section>
+          <section class="panel">
+            <h2>24-hour briefing</h2>
+            <div id="briefing">Waiting for observations.</div>
+          </section>
+          <section class="panel">
+            <h2>Change log</h2>
+            <ol id="events"></ol>
+          </section>
+          <p class="hint">
+            No response means none of the selected TCP ports answered. A device
+            may still be online. Atlas observes IP services; radio hardware is
+            not required.
+          </p>
+          <button id="export" class="secondary">
+            Export current inventory & changes
+          </button>
+          <p>
+            <a class="download" href="/api/backup"
+              >Download full database backup</a
+            >
+          </p>
+        </aside>
+      </div>
+    </main>
+    <footer>LOCAL FIRST · SQLITE HISTORY · <span id="interval"></span></footer>
+  </body>
+</html>

@@ -11,3 +11,7 @@ Measured in Debian PRoot on the Pixel 10 Pro XL, release build, during implement
 These are local microbenchmarks, not guarantees for real captures or battery usage. The initial scalar assembly implementation was slower than Rust; the final implementation uses 16-character NEON blocks with a scalar tail. Tests check vector boundaries and invalid characters as well as exhaustive two-byte UTF-8 input comparisons.
 
 Reproduce the hex comparison with `cargo build --release --locked` and `./target/release/atlas-capture --benchmark`. Run several times to account for scheduling and phone thermal state.
+
+## Investigation storage benchmark
+
+After adding session storage and indexed investigation queries, an isolated temporary database on this same phone imported 10,000 synthetic Nordic packets in **0.468 seconds**, including process startup, Rust parsing, SQLite schema initialization, session/source retention and transactional storage. A subsequent no-match substring search over that session took **0.108 seconds**. These are single local measurements with repetitive fixture data, not real-world throughput guarantees. No production observations were modified.
