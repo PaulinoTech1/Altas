@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.*
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,6 +63,38 @@ class TelemetryStorageInstrumentedTest {
             catch (_: IllegalStateException) { }
             assertEquals(0, db.measurements().count().first())
         } finally { db.close() }
+    }
+
+    @Test fun stagedExportReleasesTransactionBeforeSlowDocumentWrite() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(app, TelemetryDatabase::class.java).build()
+        val staging = java.io.File.createTempFile("atlas-export-test-", ".json", app.cacheDir)
+        try {
+            db.measurements().insert((1..250).map { row("r$it", it.toLong()) })
+            val providerEntered = CompletableDeferred<Unit>()
+            val providerRelease = CompletableDeferred<Unit>()
+            val document = java.io.ByteArrayOutputStream()
+            val export = async(Dispatchers.IO) {
+                TelemetryExport.stageThenCopy(staging, { writer ->
+                    db.withTransaction {
+                        val count = db.measurements().totalCount()
+                        TelemetryJson.writePaged(writer, count, true, 200) { offset -> db.measurements().exportPage(offset) }
+                        count
+                    }
+                }) {
+                    providerEntered.complete(Unit)
+                    runBlocking { providerRelease.await() } // a document provider stalled on a slow upload
+                    document
+                }
+            }
+            providerEntered.await()
+            // A save during the stalled provider write must not wait for it.
+            try { withTimeout(5_000) { db.withTransaction { db.measurements().insert(listOf(row("during-export", 999))) } } }
+            finally { providerRelease.complete(Unit) }
+            assertEquals(250, export.await())
+            assertEquals(250, Json.parseToJsonElement(document.toString("UTF-8")).jsonObject.getValue("recordCount").jsonPrimitive.int)
+            assertEquals(251, db.measurements().totalCount())
+            assertFalse(staging.exists())
+        } finally { db.close(); staging.delete() }
     }
 
     @Test fun preferencesSurviveReopenAndDefaultToRedaction() = runBlocking {

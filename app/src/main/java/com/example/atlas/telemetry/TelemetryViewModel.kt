@@ -47,7 +47,7 @@ class TelemetryViewModel(private val repository: TelemetryRepository) : ViewMode
     }
     fun export(uri: Uri?, redact: Boolean) {
         if (uri == null) { mutable.update { it.copy(message = "Export cancelled; no document written.") }; return }
-        operation("Export failed; the chosen document may be incomplete") { "Exported ${repository.export(uri, redact)} records (${if (redact) "identifiers redacted" else "includes identifiers"})." }
+        operation("Export failed before writing; the chosen document was not written") { "Exported ${repository.export(uri, redact)} records (${if (redact) "identifiers redacted" else "includes identifiers"})." }
     }
     fun exportUnavailable() { mutable.update { it.copy(error = "No document picker is available. Export was not started.") } }
     fun refresh() = operation("Retention check failed") { repository.maintain(); "Retention checked." }
@@ -62,7 +62,9 @@ class TelemetryViewModel(private val repository: TelemetryRepository) : ViewMode
         }
     }
     private fun fail(prefix: String, failure: Exception) {
-        mutable.update { it.copy(error = "$prefix (${failure.javaClass.simpleName}).") }
+        val incomplete = failure as? TelemetryExport.DestinationException
+        mutable.update { it.copy(error = if (incomplete != null) "${incomplete.message} (${(incomplete.cause ?: incomplete).javaClass.simpleName})."
+            else "$prefix (${failure.javaClass.simpleName}).") }
     }
     class Factory(private val repository: TelemetryRepository) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {

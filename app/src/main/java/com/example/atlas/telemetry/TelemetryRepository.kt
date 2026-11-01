@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 import com.example.atlas.AtlasApplication
 
@@ -43,19 +44,26 @@ class TelemetryRepository internal constructor(context: Context) {
         database.withTransaction { prune(value) }
     }
 
+    /**
+     * Snapshots under the mutex and a short Room transaction into a private cache file, then copies that file to the
+     * document provider with no lock or transaction held, so slow or failing providers never block saves.
+     */
     suspend fun export(uri: Uri, redact: Boolean): Int = withContext(Dispatchers.IO) {
         require(uri.scheme == "content") { "A document-provider URI is required." }
-        mutex.withLock {
-            database.withTransaction {
-                prune(preferences.values.first())
-                val count = dao.totalCount()
-                val stream = app.contentResolver.openOutputStream(uri, "wt") ?: error("Document provider did not open a stream.")
-                stream.bufferedWriter(Charsets.UTF_8).use { writer ->
+        val stagingDir = File(app.cacheDir, "export").apply { mkdirs() }
+        // A process killed mid-export cannot run its cleanup; drop such leftovers (they may contain identifiers).
+        val stale = System.currentTimeMillis() - 3_600_000L
+        stagingDir.listFiles()?.filter { it.lastModified() < stale }?.forEach { it.delete() }
+        TelemetryExport.stageThenCopy(File.createTempFile("atlas-export-", ".json", stagingDir), snapshot = { writer ->
+            mutex.withLock {
+                database.withTransaction {
+                    prune(preferences.values.first())
+                    val count = dao.totalCount()
                     TelemetryJson.writePaged(writer, count, redact, System.currentTimeMillis()) { offset -> dao.exportPage(offset) }
+                    count
                 }
-                count
             }
-        }
+        }) { app.contentResolver.openOutputStream(uri, "wt") ?: error("Document provider did not open a stream.") }
     }
 
     companion object {
