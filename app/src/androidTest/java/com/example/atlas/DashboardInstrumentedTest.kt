@@ -1,6 +1,7 @@
 package com.example.atlas
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -52,5 +53,24 @@ class DashboardInstrumentedTest {
         compose.waitForIdle()
         compose.onNodeWithText("State: Permission required").performScrollTo().assertIsDisplayed()
         assertEquals(PermissionState.REQUIRED, permissions.state(RadioType.BLUETOOTH))
+    }
+
+    @Test fun wifiPermissionDenialLeavesCollectionDisabled() {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext
+        if (RadioPermissionManager(app).missingForWifiSurvey().isEmpty()) return
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Open Wi-Fi"))
+        compose.onNodeWithText("Open Wi-Fi").performClick()
+        compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Start Wi-Fi survey"))
+        compose.onNodeWithText("Start Wi-Fi survey").assertIsNotEnabled()
+        compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Review Wi-Fi permissions"))
+        compose.onNodeWithText("Review Wi-Fi permissions").performClick()
+        val deny = device.wait(Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")), 5000)
+        assertNotNull("Expected user-triggered location dialog", deny)
+        deny.click()
+        compose.waitForIdle()
+        compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Start Wi-Fi survey"))
+        compose.onNodeWithText("Start Wi-Fi survey").assertIsNotEnabled()
+        assertTrue(RadioPermissionManager(app).missingForWifiSurvey().isNotEmpty())
     }
 }

@@ -1,0 +1,6 @@
+11-01 09:01:21.505 28917 28954 I AtlasWifiValidation: survey: rows=24, source_samples=48, updated_broadcasts=1, recent_rows=24, rssi_min=-89, rssi_max=-49, bands=[5 GHz, 2.4 GHz], connected_snapshots=1; no identifiers logged
+11-01 09:01:21.610 28917 28954 I AtlasWifiValidation: rate_guard: immediate request rejected locally; os_throttling=true; Android throttle exhaustion not forced
+11-01 09:01:57.121 28917 28954 I AtlasWifiValidation: history: source_samples=79, addresses_with_multiple_samples=24, updated_broadcasts=2; selected chart rendered; no identifiers logged
+11-01 09:01:58.802 28917 28954 I AtlasWifiValidation: manual_stop: callbacks unchanged over 1500ms; OS scan cancellation not claimed
+11-01 09:02:00.603 28917 28954 I AtlasWifiValidation: navigation_stop: callbacks unchanged over 1500ms
+11-01 09:02:03.103 28917 28954 I AtlasWifiValidation: background_stop: callbacks unchanged over 1500ms; resume stayed idle

@@ -80,7 +80,7 @@ class AndroidCapabilityRepository(
                     val manager = app.getSystemService(WifiManager::class.java)
                     available.copy(
                         state = manager?.let { enabledState(it.isWifiEnabled) } ?: RadioState.ERROR,
-                        detail = "No network scan requested or cached results read. Surveying arrives in Phase 3.",
+                        detail = "Open Wi-Fi for explicit foreground surveying and connection diagnostics.",
                         sourceApi = "PackageManager / WifiManager.isWifiEnabled",
                         error = if (manager == null) "Wi-Fi service unavailable" else null
                     )

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.atlas.WifiTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-01T14:04:07.419Z" hostname="REDACTED_HOST" time="0.025">
+  <properties/>
+  <testcase name="surveyTimeoutClosesCollectorWithoutPollingOrAutomaticRestart" classname="com.example.atlas.WifiTest" time="0.012"/>
+  <testcase name="freshnessDistinguishesCacheRecentStaleUnknownAndFutureSources" classname="com.example.atlas.WifiTest" time="0.001"/>
+  <testcase name="surveyPermissionsDoNotRequestNearbyDevicesOrBackgroundAccess" classname="com.example.atlas.WifiTest" time="0.0"/>
+  <testcase name="indexEvictionDoesNotTurnOldCacheIntoNewHistory" classname="com.example.atlas.WifiTest" time="0.0"/>
+  <testcase name="channelMappingHandlesBandsAndSpecialCases" classname="com.example.atlas.WifiTest" time="0.001"/>
+  <testcase name="historyDeduplicatesCacheAndRejectsUnknownIdentityOrTime" classname="com.example.atlas.WifiTest" time="0.0"/>
+  <testcase name="stopCancelsAndResumeRequiresAnotherUserAction" classname="com.example.atlas.WifiTest" time="0.003"/>
+  <testcase name="rateGuardUsesRollingBudgetAndThirtySecondSpacing" classname="com.example.atlas.WifiTest" time="0.0"/>
+  <testcase name="invalidAndOffGridFrequenciesAreUnavailable" classname="com.example.atlas.WifiTest" time="0.0"/>
+  <testcase name="redactedIdentifiersAreNeverReportedAsActualAddresses" classname="com.example.atlas.WifiTest" time="0.003"/>
+  <testcase name="widthCodesAreExplicitIncludingUnsupportedValues" classname="com.example.atlas.WifiTest" time="0.001"/>
+  <testcase name="permissionFailureAndRequestRejectionAreNotSuccessShaped" classname="com.example.atlas.WifiTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
