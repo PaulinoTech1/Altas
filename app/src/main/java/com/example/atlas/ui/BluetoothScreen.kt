@@ -52,12 +52,13 @@ fun LazyListScope.bluetoothContent(
         Text("RF surveying uses Nearby devices and precise location. Granting permission does not start collection.")
         OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
         TextButton(onClick = openSettings) { Text("App permission settings") }
+        if (missingPermissions.isNotEmpty()) PermissionGuidance()
     }
     item {
         Text("BLE collection", style = MaterialTheme.typography.titleLarge)
         BleControls(state, viewModel, missingPermissions.isEmpty())
         Text(state.status)
-        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        state.error?.let { DiagnosticNotice("BLE", it) }
         Text("${state.devices.size} retained addresses · ${state.receivedCount} received observations · ${state.history.size}/1024 history entries")
         Text("No automatic restart. 10-second restart cooldown; Android may impose further limits. Addresses can rotate. This is not lossless packet capture.",
             style = MaterialTheme.typography.bodySmall)
@@ -66,7 +67,7 @@ fun LazyListScope.bluetoothContent(
     item {
         Text("GATT: ${gatt.status}", style = MaterialTheme.typography.titleLarge)
         gatt.address?.let { Text("Selected connection: $it") }
-        gatt.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        gatt.error?.let { DiagnosticNotice("GATT", it) }
         if (gatt.address != null) OutlinedButton(onClick = viewModel.gatt::disconnect) { Text("Disconnect GATT") }
         Text("Connect only to a device you own or are authorized to inspect. No app-driven pairing, writes to characteristic values or automatic reconnection. Protected reads may require Android authorization.")
         gatt.serviceUuids.forEach { Text("Service: $it", style = MaterialTheme.typography.bodySmall) }

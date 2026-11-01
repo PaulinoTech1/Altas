@@ -1,0 +1,68 @@
+﻿<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="14" failures="0" errors="0" skipped="3" time="0.000" timestamp="2026-11-01T15:09:37" hostname="localhost">
+  <testsuite name="com.example.atlas.BlePhysicalInstrumentedTest" tests="1" failures="0" errors="0" skipped="1" time="1.021" timestamp="2026-11-01T15:09:37" hostname="localhost">
+    <properties>
+      <property name="device" value="REDACTED" />
+    </properties>
+    <testcase name="realAdvertisementsAndForegroundCleanup" classname="com.example.atlas.BlePhysicalInstrumentedTest" time="1.021">
+      <skipped>org.junit.AssumptionViolatedException: Requires explicit atlas.bleHardware=true
+	at org.junit.Assume.assumeTrue(Assume.java:68)
+	at com.example.atlas.BlePhysicalInstrumentedTest.realAdvertisementsAndForegroundCleanup(BlePhysicalInstrumentedTest.kt:33)
+</skipped>
+    </testcase>
+  </testsuite>
+  <testsuite name="com.example.atlas.CapabilityInstrumentedTest" tests="2" failures="0" errors="0" skipped="0" time="0.005" timestamp="2026-11-01T15:09:37" hostname="localhost">
+    <properties>
+      <property name="device" value="REDACTED" />
+    </properties>
+    <testcase name="manifestOnlyAuthorizesImplementedOperations" classname="com.example.atlas.CapabilityInstrumentedTest" time="0.001" />
+    <testcase name="snapshotMatchesPhysicalPlatformAndDoesNotProduceMeasurements" classname="com.example.atlas.CapabilityInstrumentedTest" time="0.004" />
+  </testsuite>
+  <testsuite name="com.example.atlas.CellularPhysicalInstrumentedTest" tests="1" failures="0" errors="0" skipped="1" time="0.715" timestamp="2026-11-01T15:09:37" hostname="localhost">
+    <properties>
+      <property name="device" value="REDACTED" />
+    </properties>
+    <testcase name="realCellularReportsAndCleanup" classname="com.example.atlas.CellularPhysicalInstrumentedTest" time="0.715">
+      <skipped>org.junit.AssumptionViolatedException: Requires explicit atlas.cellularHardware=true
+	at org.junit.Assume.assumeTrue(Assume.java:68)
+	at com.example.atlas.CellularPhysicalInstrumentedTest.realCellularReportsAndCleanup(CellularPhysicalInstrumentedTest.kt:38)
+</skipped>
+    </testcase>
+  </testsuite>
+  <testsuite name="com.example.atlas.DashboardInstrumentedTest" tests="4" failures="0" errors="0" skipped="0" time="13.363" timestamp="2026-11-01T15:09:37" hostname="localhost">
+    <properties>
+      <property name="device" value="REDACTED" />
+    </properties>
+    <testcase name="wifiPermissionDenialLeavesCollectionDisabled" classname="com.example.atlas.DashboardInstrumentedTest" time="2.354" />
+    <testcase name="cellularPermissionDenialLeavesCollectionDisabled" classname="com.example.atlas.DashboardInstrumentedTest" time="6.858" />
+    <testcase name="dashboardShowsAllRadiosAndHistoryIsHonest" classname="com.example.atlas.DashboardInstrumentedTest" time="2.161" />
+    <testcase name="bluetoothPermissionIsRequestedByActionAndDenialIsSafe" classname="com.example.atlas.DashboardInstrumentedTest" time="1.990" />
+  </testsuite>
+  <testsuite name="com.example.atlas.ExampleInstrumentedTest" tests="1" failures="0" errors="0" skipped="0" time="0.003" timestamp="2026-11-01T15:09:37" hostname="localhost">
+    <properties>
+      <property name="device" value="REDACTED" />
+    </properties>
+    <testcase name="useAppContext" classname="com.example.atlas.ExampleInstrumentedTest" time="0.003" />
+  </testsuite>
+  <testsuite name="com.example.atlas.TelemetryStorageInstrumentedTest" tests="4" failures="0" errors="0" skipped="0" time="0.287" timestamp="2026-11-01T15:09:37" hostname="localhost">
+    <properties>
+      <property name="device" value="REDACTED" />
+    </properties>
+    <testcase name="preferencesSurviveReopenAndDefaultToRedaction" classname="com.example.atlas.TelemetryStorageInstrumentedTest" time="0.049" />
+    <testcase name="failedTransactionDoesNotLeavePartiallySavedBatch" classname="com.example.atlas.TelemetryStorageInstrumentedTest" time="0.032" />
+    <testcase name="roomReopenPreservesNullableValuesAndDeduplicates" classname="com.example.atlas.TelemetryStorageInstrumentedTest" time="0.031" />
+    <testcase name="transactionalRetentionKeepsNewestAndHistoryFilters" classname="com.example.atlas.TelemetryStorageInstrumentedTest" time="0.175" />
+  </testsuite>
+  <testsuite name="com.example.atlas.WifiPhysicalInstrumentedTest" tests="1" failures="0" errors="0" skipped="1" time="0.700" timestamp="2026-11-01T15:09:37" hostname="localhost">
+    <properties>
+      <property name="device" value="REDACTED" />
+    </properties>
+    <testcase name="realSurveyConnectionAndCleanup" classname="com.example.atlas.WifiPhysicalInstrumentedTest" time="0.700">
+      <skipped>org.junit.AssumptionViolatedException: Requires explicit atlas.wifiHardware=true
+	at org.junit.Assume.assumeTrue(Assume.java:68)
+	at com.example.atlas.WifiPhysicalInstrumentedTest.realSurveyConnectionAndCleanup(WifiPhysicalInstrumentedTest.kt:37)
+</skipped>
+    </testcase>
+  </testsuite>
+</testsuites>
+

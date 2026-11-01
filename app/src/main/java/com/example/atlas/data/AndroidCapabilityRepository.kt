@@ -71,7 +71,7 @@ class AndroidCapabilityRepository(
                     val adapter = app.getSystemService(NfcManager::class.java)?.defaultAdapter
                     available.copy(
                         state = adapter?.let { enabledState(it.isEnabled) } ?: RadioState.ERROR,
-                        detail = "Reader mode inactive. Tag reading and APDU operations arrive in Phase 5.",
+                        detail = "Open NFC to start a foreground reader session. Physical tag support depends on the tag and Android's public APIs.",
                         sourceApi = "PackageManager / NfcAdapter.isEnabled",
                         error = if (adapter == null) "NFC adapter unavailable despite feature declaration" else null
                     )
@@ -96,7 +96,7 @@ class AndroidCapabilityRepository(
                     }
                     available.copy(
                         state = RadioState.NOT_QUERIED,
-                        detail = "$transport Modem power, registration, SIMs and LTE/NR metrics are not queried in Phase 1.",
+                        detail = "$transport Open Cellular for explicit subscription, registration and LTE/NR diagnostics.",
                         sourceApi = "PackageManager / ConnectivityManager.getNetworkCapabilities"
                     )
                 }

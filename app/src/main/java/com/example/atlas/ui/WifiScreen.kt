@@ -41,14 +41,18 @@ fun LazyListScope.wifiContent(
         Text("Wi-Fi surveying can reveal location. Android requires precise location permission and enabled location services.")
         OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
         TextButton(onClick = openSettings) { Text("App permission settings") }
+        if (missingPermissions.isNotEmpty()) PermissionGuidance()
         if (state.collecting) {
             Button(onClick = { viewModel.stop() }) { Text("Stop Wi-Fi survey") }
             OutlinedButton(onClick = viewModel::requestScan) { Text("Request Wi-Fi scan") }
         } else Button(onClick = viewModel::start, enabled = missingPermissions.isEmpty()) { Text("Start Wi-Fi survey") }
         Text(state.status)
-        state.request?.let { Text(it.message) }
+        state.request?.let {
+            if (it.status == WifiRequestStatus.ACCEPTED) Text(it.message)
+            else DiagnosticNotice("WIFI", "${it.status.name}: ${it.message}")
+        }
         Text("Android scan throttling: ${when (state.osScanThrottlingEnabled) { true -> "Enabled"; false -> "Disabled"; null -> "Not reported" }}")
-        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        state.error?.let { DiagnosticNotice("WIFI", it) }
         Text("Sessions stop after 60 seconds. No automatic retries. Requests are spaced by at least 30 seconds and limited to four per two minutes; Android can further restrict scans.", style = MaterialTheme.typography.bodySmall)
         Text("Stop unregisters Atlas callbacks. Android provides no cancellation API for a hardware scan already requested.", style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear Wi-Fi history") }

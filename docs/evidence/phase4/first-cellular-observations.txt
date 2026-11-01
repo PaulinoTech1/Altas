@@ -1,0 +1,11 @@
+11-01 09:24:09.848  4384  4444 I AtlasCellValidation: reports: active_slots=1, base_type=NR, carrier_hint=No override, voice_state=In service, registration_rows=3, cells=9, registered_cells=1, reported_nonregistered_cells=8, cell_delivery=REQUEST_RESPONSE, request_status=DELIVERED, lte_available=0, nr_available=21; no identifiers logged
+11-01 09:24:09.848  4384  4444 I AtlasCellValidation: LTE RSRP: available_values=0, min=null, max=null
+11-01 09:24:09.848  4384  4444 I AtlasCellValidation: LTE RSRQ: available_values=0, min=null, max=null
+11-01 09:24:09.848  4384  4444 I AtlasCellValidation: LTE RSSNR: available_values=0, min=null, max=null
+11-01 09:24:09.848  4384  4444 I AtlasCellValidation: NR SS-RSRP: available_values=10, min=-121, max=-100
+11-01 09:24:09.848  4384  4444 I AtlasCellValidation: NR SS-RSRQ: available_values=10, min=-17, max=-11
+11-01 09:24:09.848  4384  4444 I AtlasCellValidation: NR SS-SINR: available_values=1, min=10, max=10
+11-01 09:24:09.918  4384  4444 I AtlasCellValidation: rate_guard: immediate explicit refresh rejected locally; modem rate-limit exhaustion not forced
+11-01 09:24:11.557  4384  4444 I AtlasCellValidation: manual_stop: report count unchanged over 1500ms
+11-01 09:24:13.341  4384  4444 I AtlasCellValidation: navigation_stop: report count unchanged over 1500ms
+11-01 09:24:15.983  4384  4444 I AtlasCellValidation: background_stop: report count unchanged over 1500ms; resume stayed idle

@@ -16,3 +16,8 @@ local.properties
 /phase1-*.log
 /phase2-*.log
 /phase3-*.log
+/phase4-*.log
+/phase6-*.log
+/preview-*.log
+# Physical telemetry exports contain signal and timing data even when identifiers are redacted.
+/docs/evidence/**/*export*.json

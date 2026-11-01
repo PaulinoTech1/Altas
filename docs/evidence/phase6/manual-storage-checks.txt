@@ -1,0 +1,18 @@
+﻿Physical device storage checks - 2026-11-01
+Final APK SHA256: 7CF01FAC079DD3B0FB89982B919F348F8E2683B6ABDC15352B9D1DBAFDEAC4E2
+Device: Pixel 10 Pro XL, Android 17 / API 37.
+Final direct instrumentation: 11 regression tests passed; separate opt-in cellular/storage test passed.
+Earlier complete Gradle device suite: 11 passed, 3 opt-in hardware tests skipped.
+First real cellular/storage run: 93 saved records; 26 unavailable values; repeat save added 0.
+First force-stop/relaunch: History showed Saved records: 93 and collection inactive.
+First SAF cancellation: Export cancelled; no document written.
+First SAF redacted export: 93 records, 26 null values, 0 interface identifiers, 0 populated metadata objects.
+Final APK upgrade preserved existing saved telemetry.
+Final real cellular/storage run: 234 total saved records; 68 unavailable values; repeat save added 0.
+Final force-stop/relaunch cold start: Status ok, 392ms (single observation, not a benchmark).
+Final SAF export destination: local Downloads/atlas-rf-1793546160410.json.
+Final UI: Saved records: 234; Exported 234 records (identifiers redacted); Collection inactive.
+Final JSON parsed on host: schemaVersion=1, recordCount=234, actual records=234, identifiersRedacted=true, interface identifiers present=0, populated metadata objects=0, unavailable values=68.
+Actual final export exercised two database pages (page size 200).
+No speed test, phone call, Wi-Fi toggle, cellular mode change or external service was initiated by validation.
+Foreground changed after export verification; subsequent screenshot was discarded and device UI interaction stopped. No evidence screenshot retained.

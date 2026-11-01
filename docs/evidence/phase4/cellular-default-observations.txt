@@ -1,0 +1,14 @@
+11-01 09:44:52.700 14419 14435 I AtlasCellValidation: data_transport[before_collection]: wifi_enabled=false, default_cellular=true, default_wifi=false, vpn=false, internet_capability=true, android_validated=true; platform routing/validation only, no Atlas traffic probe
+11-01 09:44:56.314 14419 14435 I AtlasCellValidation: data_transport[during_collection]: wifi_enabled=false, default_cellular=true, default_wifi=false, vpn=false, internet_capability=true, android_validated=true; platform routing/validation only, no Atlas traffic probe
+11-01 09:44:56.314 14419 14435 I AtlasCellValidation: cell_fields: identifiers_available=1, pci_available=3, source_timestamps_available=3, primary_roles=1, secondary_roles=0; no identifier values logged
+11-01 09:44:56.314 14419 14435 I AtlasCellValidation: reports: active_slots=1, base_type=NR, carrier_hint=No override, voice_state=In service, registration_rows=3, cells=3, registered_cells=1, reported_nonregistered_cells=2, cell_delivery=REQUEST_RESPONSE, request_status=DELIVERED, lte_available=0, nr_available=9; no identifiers logged
+11-01 09:44:56.314 14419 14435 I AtlasCellValidation: LTE RSRP: available_values=0, min=null, max=null
+11-01 09:44:56.315 14419 14435 I AtlasCellValidation: LTE RSRQ: available_values=0, min=null, max=null
+11-01 09:44:56.315 14419 14435 I AtlasCellValidation: LTE RSSNR: available_values=0, min=null, max=null
+11-01 09:44:56.315 14419 14435 I AtlasCellValidation: NR SS-RSRP: available_values=4, min=-110, max=-103
+11-01 09:44:56.315 14419 14435 I AtlasCellValidation: NR SS-RSRQ: available_values=4, min=-17, max=-12
+11-01 09:44:56.315 14419 14435 I AtlasCellValidation: NR SS-SINR: available_values=1, min=6, max=6
+11-01 09:44:56.393 14419 14435 I AtlasCellValidation: rate_guard: immediate explicit refresh rejected locally; modem rate-limit exhaustion not forced
+11-01 09:44:58.028 14419 14435 I AtlasCellValidation: manual_stop: report count unchanged over 1500ms
+11-01 09:44:59.809 14419 14435 I AtlasCellValidation: navigation_stop: report count unchanged over 1500ms
+11-01 09:45:02.385 14419 14435 I AtlasCellValidation: background_stop: report count unchanged over 1500ms; resume stayed idle

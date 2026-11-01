@@ -4,6 +4,7 @@ import android.location.LocationManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -28,6 +29,33 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class BlePhysicalInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+
+    @Test fun passiveAirPodsAdvertisementProbe() {
+        assumeTrue("Requires explicit atlas.airpods=true", InstrumentationRegistry.getArguments().getString("atlas.airpods") == "true")
+        val app = InstrumentationRegistry.getInstrumentation().targetContext
+        assertTrue("BLE permissions must be granted through Android settings",
+            RadioPermissionManager(app).missingForBleScan().isEmpty())
+        assertTrue("Location services must already be enabled",
+            app.getSystemService(LocationManager::class.java).isLocationEnabled)
+        val vm = ViewModelProvider(compose.activity)[BluetoothViewModel::class.java]
+        click("Open Bluetooth")
+        click("20s")
+        click("Start BLE scan")
+        compose.waitUntil(3_000) { vm.state.value.scanning || vm.state.value.error != null }
+        assertNull(vm.state.value.error)
+        compose.waitUntil(25_000) { !vm.state.value.scanning }
+        val result = vm.state.value
+        assertNull(result.error)
+        assertEquals("Scan time limit reached", result.status)
+        val namedAirPods = result.history.count {
+            it.advertisement.name?.contains("AirPods", ignoreCase = true) == true
+        }
+        val appleManufacturer = result.history.count { event ->
+            event.advertisement.manufacturerData.any { it.companyId == 0x004C }
+        }
+        Log.i("AtlasBleValidation", "airpods_probe: observations=${result.receivedCount}, addresses=${result.devices.size}, airpods_named=$namedAirPods, apple_manufacturer=$appleManufacturer; no GATT connection or identifiers logged")
+        assertNull("Passive probe must never auto-connect", vm.gatt.state.value.address)
+    }
 
     @Test fun realAdvertisementsAndForegroundCleanup() {
         assumeTrue("Requires explicit atlas.bleHardware=true", InstrumentationRegistry.getArguments().getString("atlas.bleHardware") == "true")
@@ -82,6 +110,8 @@ class BlePhysicalInstrumentedTest {
         click("Start BLE scan")
         compose.waitUntil(2000) { vm.state.value.error != null }
         assertTrue(vm.state.value.error.orEmpty().contains("cooldown"))
+        compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("ATLAS-BLE-COOLDOWN"))
+        compose.onNodeWithText("ATLAS-BLE-COOLDOWN").assertIsDisplayed()
         Log.i("AtlasBleValidation", "cooldown: immediate restart rejected visibly")
 
         SystemClock.sleep(10_100)

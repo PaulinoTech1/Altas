@@ -54,6 +54,7 @@ class CapabilityInstrumentedTest {
             "android.permission.ACCESS_FINE_LOCATION",
             "android.permission.ACCESS_WIFI_STATE", "android.permission.ACCESS_NETWORK_STATE",
             "android.permission.CHANGE_WIFI_STATE",
+            "android.permission.READ_PHONE_STATE",
             "com.example.atlas.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         ), info.requestedPermissions.orEmpty().toSet())
         assertEquals(0, app.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_ALLOW_BACKUP)

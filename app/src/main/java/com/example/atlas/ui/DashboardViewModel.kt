@@ -31,9 +31,9 @@ class DashboardViewModel(private val repository: CapabilityRepository) : ViewMod
                 mutableState.value = DashboardState(radios = repository.snapshot())
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 mutableState.value = mutableState.value.copy(
-                    refreshing = false, error = "Capability check failed. Refresh to retry; previous values may be stale."
+                    refreshing = false, error = "Capability check failed (${failure.javaClass.simpleName}). Refresh to retry; previous values may be stale."
                 )
             }
         }

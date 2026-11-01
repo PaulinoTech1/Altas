@@ -9,6 +9,9 @@ import com.example.atlas.model.RadioType
 
 /** Operation-specific policy; no launch-time or background permission requests. */
 class RadioPermissionManager(private val context: Context) {
+    fun missingForCellular(): List<String> = cellularPermissions.filter {
+        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+    }
     fun missingForWifiSurvey(): List<String> = wifiSurveyPermissions.filter {
         ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
     }
@@ -26,6 +29,8 @@ class RadioPermissionManager(private val context: Context) {
     )
 
     companion object {
+        val cellularPermissions = listOf(Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
         val wifiSurveyPermissions = listOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
         val bleScanPermissions = listOf(
             Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT,

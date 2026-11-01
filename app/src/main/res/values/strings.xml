@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Atlas RF</string>
+    <string name="permission_settings_help">If Android no longer shows a permission prompt, use App permission settings to review access.</string>
 </resources>

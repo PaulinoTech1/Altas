@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="10" failures="1" errors="0" skipped="3" time="0.000" timestamp="2026-11-01T14:22:38" hostname="localhost">
+  <testsuite name="com.example.atlas.BlePhysicalInstrumentedTest" tests="1" failures="0" errors="0" skipped="1" time="1.055" timestamp="2026-11-01T14:22:38" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="realAdvertisementsAndForegroundCleanup" classname="com.example.atlas.BlePhysicalInstrumentedTest" time="1.055">
+      <skipped>org.junit.AssumptionViolatedException: Requires explicit atlas.bleHardware=true
+	at org.junit.Assume.assumeTrue(Assume.java:68)
+	at com.example.atlas.BlePhysicalInstrumentedTest.realAdvertisementsAndForegroundCleanup(BlePhysicalInstrumentedTest.kt:33)
+</skipped>
+    </testcase>
+  </testsuite>
+  <testsuite name="com.example.atlas.CapabilityInstrumentedTest" tests="2" failures="0" errors="0" skipped="0" time="0.007" timestamp="2026-11-01T14:22:38" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="manifestOnlyAuthorizesImplementedOperations" classname="com.example.atlas.CapabilityInstrumentedTest" time="0.001" />
+    <testcase name="snapshotMatchesPhysicalPlatformAndDoesNotProduceMeasurements" classname="com.example.atlas.CapabilityInstrumentedTest" time="0.006" />
+  </testsuite>
+  <testsuite name="com.example.atlas.CellularPhysicalInstrumentedTest" tests="1" failures="0" errors="0" skipped="1" time="0.738" timestamp="2026-11-01T14:22:38" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="realCellularReportsAndCleanup" classname="com.example.atlas.CellularPhysicalInstrumentedTest" time="0.738">
+      <skipped>org.junit.AssumptionViolatedException: Requires explicit atlas.cellularHardware=true
+	at org.junit.Assume.assumeTrue(Assume.java:68)
+	at com.example.atlas.CellularPhysicalInstrumentedTest.realCellularReportsAndCleanup(CellularPhysicalInstrumentedTest.kt:32)
+</skipped>
+    </testcase>
+  </testsuite>
+  <testsuite name="com.example.atlas.DashboardInstrumentedTest" tests="4" failures="1" errors="0" skipped="0" time="13.095" timestamp="2026-11-01T14:22:38" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="wifiPermissionDenialLeavesCollectionDisabled" classname="com.example.atlas.DashboardInstrumentedTest" time="1.921" />
+    <testcase name="cellularPermissionDenialLeavesCollectionDisabled" classname="com.example.atlas.DashboardInstrumentedTest" time="6.315">
+      <failure>java.lang.AssertionError: Expected contextual permission dialog
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at com.example.atlas.DashboardInstrumentedTest.cellularPermissionDenialLeavesCollectionDisabled(DashboardInstrumentedTest.kt:89)
+</failure>
+    </testcase>
+    <testcase name="dashboardShowsAllRadiosAndHistoryIsHonest" classname="com.example.atlas.DashboardInstrumentedTest" time="2.093" />
+    <testcase name="bluetoothPermissionIsRequestedByActionAndDenialIsSafe" classname="com.example.atlas.DashboardInstrumentedTest" time="2.766" />
+  </testsuite>
+  <testsuite name="com.example.atlas.ExampleInstrumentedTest" tests="1" failures="0" errors="0" skipped="0" time="0.001" timestamp="2026-11-01T14:22:38" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="useAppContext" classname="com.example.atlas.ExampleInstrumentedTest" time="0.001" />
+  </testsuite>
+  <testsuite name="com.example.atlas.WifiPhysicalInstrumentedTest" tests="1" failures="0" errors="0" skipped="1" time="1.252" timestamp="2026-11-01T14:22:38" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="realSurveyConnectionAndCleanup" classname="com.example.atlas.WifiPhysicalInstrumentedTest" time="1.252">
+      <skipped>org.junit.AssumptionViolatedException: Requires explicit atlas.wifiHardware=true
+	at org.junit.Assume.assumeTrue(Assume.java:68)
+	at com.example.atlas.WifiPhysicalInstrumentedTest.realSurveyConnectionAndCleanup(WifiPhysicalInstrumentedTest.kt:37)
+</skipped>
+    </testcase>
+  </testsuite>
+</testsuites>
+

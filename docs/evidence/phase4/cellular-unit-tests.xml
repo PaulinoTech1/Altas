@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.atlas.CellularTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-01T14:31:25.205Z" hostname="REDACTED_HOST" time="0.049">
+  <properties/>
+  <testcase name="metricRangesRejectImpossibleValues" classname="com.example.atlas.CellularTest" time="0.001"/>
+  <testcase name="requestResponseDoesNotMakeOldSourceTimestampFresh" classname="com.example.atlas.CellularTest" time="0.0"/>
+  <testcase name="deniedAndUnsupportedAccessAreVisibleFailures" classname="com.example.atlas.CellularTest" time="0.006"/>
+  <testcase name="identifiersUseSeparateIntAndLongSentinelsAndAllowPciZero" classname="com.example.atlas.CellularTest" time="0.0"/>
+  <testcase name="sessionTimeoutClosesCollectorWithoutAutomaticRestart" classname="com.example.atlas.CellularTest" time="0.012"/>
+  <testcase name="permissionsExcludeNumbersPrivilegedAndBackgroundAccess" classname="com.example.atlas.CellularTest" time="0.0"/>
+  <testcase name="sentinelsAreUnavailableAndRealZeroSinrIsPreserved" classname="com.example.atlas.CellularTest" time="0.001"/>
+  <testcase name="changingSubscriptionStopsAndDoesNotRelabelOldSignalHistory" classname="com.example.atlas.CellularTest" time="0.006"/>
+  <testcase name="rateGuardRetainsThirtySecondSpacing" classname="com.example.atlas.CellularTest" time="0.001"/>
+  <testcase name="lteRssnrUsesPublicApiDbWithoutTenthsScaling" classname="com.example.atlas.CellularTest" time="0.0"/>
+  <testcase name="historiesAreBoundedAndIdenticalCellReportsAreDeduplicated" classname="com.example.atlas.CellularTest" time="0.013"/>
+  <testcase name="stopCancelsPendingWaitWithoutPretendingTheModemTimedOut" classname="com.example.atlas.CellularTest" time="0.006"/>
+  <testcase name="carrierHintAndServingRoleRemainDistinctFromTechnology" classname="com.example.atlas.CellularTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
