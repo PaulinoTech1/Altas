@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="5" failures="0" errors="0" skipped="0" time="0.000" timestamp="2026-11-01T13:27:26" hostname="localhost">
+  <testsuite name="com.example.atlas.CapabilityInstrumentedTest" tests="2" failures="0" errors="0" skipped="0" time="0.067" timestamp="2026-11-01T13:27:26" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="manifestDoesNotAuthorizeAcquisitionOrNetworking" classname="com.example.atlas.CapabilityInstrumentedTest" time="0.002" />
+    <testcase name="snapshotMatchesPhysicalPlatformAndDoesNotProduceMeasurements" classname="com.example.atlas.CapabilityInstrumentedTest" time="0.065" />
+  </testsuite>
+  <testsuite name="com.example.atlas.DashboardInstrumentedTest" tests="2" failures="0" errors="0" skipped="0" time="4.922" timestamp="2026-11-01T13:27:26" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="dashboardShowsAllRadiosAndHistoryIsHonest" classname="com.example.atlas.DashboardInstrumentedTest" time="2.540" />
+    <testcase name="bluetoothPermissionIsRequestedByActionAndDenialIsSafe" classname="com.example.atlas.DashboardInstrumentedTest" time="2.382" />
+  </testsuite>
+  <testsuite name="com.example.atlas.ExampleInstrumentedTest" tests="1" failures="0" errors="0" skipped="0" time="0.002" timestamp="2026-11-01T13:27:26" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="useAppContext" classname="com.example.atlas.ExampleInstrumentedTest" time="0.002" />
+  </testsuite>
+</testsuites>
+

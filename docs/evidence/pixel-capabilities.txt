@@ -1,0 +1,4 @@
+11-01 08:27:21.201 20119 20136 I AtlasValidation: BLUETOOTH: hardware=AVAILABLE, permission=REQUIRED, state=PERMISSION_REQUIRED; Bluetooth reported; BLE reported. Allow Nearby devices to check adapter state.
+11-01 08:27:21.201 20119 20136 I AtlasValidation: NFC: hardware=AVAILABLE, permission=NOT_REQUIRED, state=ENABLED; Reader mode inactive. Tag reading and APDU operations arrive in Phase 5.
+11-01 08:27:21.201 20119 20136 I AtlasValidation: WIFI: hardware=AVAILABLE, permission=NOT_REQUIRED, state=ENABLED; No network scan requested or cached results read. Surveying arrives in Phase 3.
+11-01 08:27:21.201 20119 20136 I AtlasValidation: CELLULAR: hardware=AVAILABLE, permission=NOT_REQUIRED, state=NOT_QUERIED; Active default network does not report cellular transport. Modem power, registration, SIMs and LTE/NR metrics are not queried in Phase 1.

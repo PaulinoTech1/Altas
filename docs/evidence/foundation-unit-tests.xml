@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.atlas.FoundationTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-01T13:27:11.087Z" hostname="REDACTED_HOST" time="0.29">
+  <properties/>
+  <testcase name="permissionPolicyOnlyRequestsBluetoothStateAccess" classname="com.example.atlas.FoundationTest" time="0.061"/>
+  <testcase name="repositoryFailureRemainsVisible" classname="com.example.atlas.FoundationTest" time="0.216"/>
+  <testcase name="pauseCancelsInFlightRefreshWithoutReportingFailure" classname="com.example.atlas.FoundationTest" time="0.007"/>
+  <testcase name="refreshPublishesRepositorySnapshot" classname="com.example.atlas.FoundationTest" time="0.003"/>
+  <testcase name="deniedAndGrantedAreDistinct" classname="com.example.atlas.FoundationTest" time="0.0"/>
+  <testcase name="unknownIsNotAZeroMeasurement" classname="com.example.atlas.FoundationTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
