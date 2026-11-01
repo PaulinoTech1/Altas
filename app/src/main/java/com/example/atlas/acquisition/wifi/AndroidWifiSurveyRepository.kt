@@ -80,7 +80,7 @@ class AndroidWifiSurveyRepository(context: Context, private val permissions: Rad
                     preflight()
                     val info = networkCapabilities.transportInfo as? WifiInfo ?: return
                     trySend(WifiEvent.Connection(WifiConnection(
-                        network.networkHandle.toString(), WifiValues.ssid(info.ssid.removeSurrounding("\"")),
+                        network.networkHandle.toString(), WifiValues.ssidFromPlatformText(info.ssid),
                         WifiValues.bssid(info.bssid), WifiValues.rssi(info.rssi), WifiValues.positive(info.frequency),
                         WifiValues.channel(info.frequency), WifiValues.positive(info.linkSpeed),
                         WifiValues.positive(info.txLinkSpeedMbps), WifiValues.positive(info.rxLinkSpeedMbps),
@@ -124,7 +124,7 @@ class AndroidWifiSurveyRepository(context: Context, private val permissions: Rad
             val now = SystemClock.elapsedRealtimeNanos() / 1000
             val wall = System.currentTimeMillis()
             val rows = source.take(256).map { result -> WifiObservation(
-                UUID.randomUUID().toString(), WifiValues.ssid(scanSsid(result)), WifiValues.bssid(result.BSSID),
+                UUID.randomUUID().toString(), scanSsid(result), WifiValues.bssid(result.BSSID),
                 WifiValues.rssi(result.level), WifiValues.positive(result.frequency), WifiValues.channel(result.frequency),
                 WifiValues.width(result.channelWidth), WifiValues.positive(result.centerFreq0), WifiValues.positive(result.centerFreq1),
                 result.capabilities?.take(2048), wall, now, result.timestamp.takeIf { it > 0 }, sessionStarted, delivery
@@ -134,5 +134,7 @@ class AndroidWifiSurveyRepository(context: Context, private val permissions: Rad
     }
 
     @Suppress("DEPRECATION") // API 31/32 do not expose ScanResult.getWifiSsid().
-    private fun scanSsid(result: ScanResult): String? = if (Build.VERSION.SDK_INT >= 33) result.wifiSsid?.toString() else result.SSID
+    private fun scanSsid(result: ScanResult): String? =
+        // WifiSsid.toString() quotes UTF-8 names and gives bare hex otherwise; decode the octets instead.
+        if (Build.VERSION.SDK_INT >= 33) WifiValues.ssidFromBytes(result.wifiSsid?.bytes) else WifiValues.legacySsid(result.SSID)
 }

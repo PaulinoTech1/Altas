@@ -1,6 +1,10 @@
 package com.example.atlas.acquisition.wifi
 
+import com.example.atlas.acquisition.bluetooth.hex
 import kotlinx.coroutines.flow.Flow
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
 
 enum class WifiDelivery { CACHE_READ, UPDATED_BROADCAST, NOT_UPDATED_BROADCAST }
 enum class WifiFreshness(val label: String) { RECENT("Recent platform update"), CACHED("Cached"), STALE("Stale"), UNKNOWN("Source age unavailable") }
@@ -117,6 +121,31 @@ object WifiValues {
     }
     fun ssid(value: String?): String? = value?.takeUnless { it.isEmpty() || it == "<unknown ssid>" }
         ?.filterNot { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }?.take(128)?.takeIf { it.isNotBlank() }
+
+    /** Marks SSID octets that are not valid UTF-8, so they are never mistaken for a printable network name. */
+    const val NON_UTF8_SSID_PREFIX = "<non-UTF-8 SSID 0x"
+
+    /** Raw SSID octets (API 33+ WifiSsid.getBytes()). Empty or all-zero octets are a hidden network: null, like other unavailable SSIDs. */
+    fun ssidFromBytes(bytes: ByteArray?): String? {
+        if (bytes == null || bytes.all { it == 0.toByte() }) return null
+        val text = try {
+            Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
+        } catch (_: CharacterCodingException) { return "$NON_UTF8_SSID_PREFIX${bytes.hex()}>" }
+        return ssid(text)
+    }
+
+    /** WifiInfo.getSSID(): quoted UTF-8 text, unquoted hex digits for non-UTF-8 octets, or "<unknown ssid>". */
+    fun ssidFromPlatformText(value: String?): String? = when {
+        value == null -> null
+        value.length >= 2 && value.startsWith('"') && value.endsWith('"') -> ssid(value.substring(1, value.length - 1))
+        value.length in 2..64 && value.length % 2 == 0 && value.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' } ->
+            ssidFromBytes(ByteArray(value.length / 2) { i -> value.substring(i * 2, i * 2 + 2).toInt(16).toByte() })
+        else -> ssid(value)
+    }
+
+    /** API 31/32 ScanResult.SSID text; keeps the historical surrounding-quote stripping. */
+    fun legacySsid(value: String?): String? = ssid(value?.removeSurrounding("\""))
     fun bssid(value: String?): String? = value?.lowercase()?.takeIf {
         it.matches(Regex("(?:[0-9a-f]{2}:){5}[0-9a-f]{2}")) && it !in setOf("02:00:00:00:00:00", "00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff")
     }
