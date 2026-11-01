@@ -1,0 +1,5 @@
+11-01 08:38:58.833 22038 22052 I AtlasBleValidation: timed_scan: devices=7, received=59, retained=59, rssi_min=-95, rssi_max=-85, source_timestamped=59, malformed=0; no GATT connection
+11-01 08:39:00.641 22038 22052 I AtlasBleValidation: manual_stop: no observations added over 1500ms
+11-01 08:39:00.717 22038 22052 I AtlasBleValidation: cooldown: immediate restart rejected visibly
+11-01 08:39:12.637 22038 22052 I AtlasBleValidation: navigation_stop: scan stopped; no observations added over 1500ms
+11-01 08:39:25.299 22038 22052 I AtlasBleValidation: background_stop: no observations added over 1500ms; resume stayed idle; GATT not connected

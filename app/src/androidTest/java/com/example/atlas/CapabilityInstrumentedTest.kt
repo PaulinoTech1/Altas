@@ -44,12 +44,14 @@ class CapabilityInstrumentedTest {
         }
     }
 
-    @Test fun manifestDoesNotAuthorizeAcquisitionOrNetworking() {
+    @Test fun manifestOnlyAuthorizesImplementedOperations() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext
         @Suppress("DEPRECATION")
         val info = app.packageManager.getPackageInfo(app.packageName, PackageManager.GET_PERMISSIONS)
         assertEquals(setOf(
             "android.permission.BLUETOOTH_CONNECT", "android.permission.NFC",
+            "android.permission.BLUETOOTH_SCAN", "android.permission.ACCESS_COARSE_LOCATION",
+            "android.permission.ACCESS_FINE_LOCATION",
             "android.permission.ACCESS_WIFI_STATE", "android.permission.ACCESS_NETWORK_STATE",
             "com.example.atlas.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         ), info.requestedPermissions.orEmpty().toSet())

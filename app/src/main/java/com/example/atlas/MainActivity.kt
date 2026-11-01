@@ -9,6 +9,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.example.atlas.acquisition.bluetooth.AndroidBleScanner
+import com.example.atlas.acquisition.bluetooth.AndroidGattClient
+import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
 import com.example.atlas.data.AndroidCapabilityRepository
 import com.example.atlas.permissions.RadioPermissionManager
 import com.example.atlas.ui.AtlasApp
@@ -18,9 +24,14 @@ import com.example.atlas.ui.theme.AtlasTheme
 class MainActivity : ComponentActivity() {
     private lateinit var permissions: RadioPermissionManager
     private lateinit var dashboard: DashboardViewModel
+    private lateinit var bluetooth: BluetoothViewModel
+    private var blePermissionsMissing by mutableStateOf(emptyList<String>())
     private val permissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { dashboard.refresh() }
+    ) {
+        blePermissionsMissing = permissions.missingForBleScan()
+        dashboard.refresh()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,10 +39,18 @@ class MainActivity : ComponentActivity() {
         dashboard = ViewModelProvider(this, DashboardViewModel.Factory(
             AndroidCapabilityRepository(applicationContext, permissions)
         ))[DashboardViewModel::class.java]
+        bluetooth = ViewModelProvider(this, BluetoothViewModel.Factory(
+            AndroidBleScanner(applicationContext, permissions), AndroidGattClient(applicationContext)
+        ))[BluetoothViewModel::class.java]
         enableEdgeToEdge()
         setContent {
             AtlasTheme {
-                AtlasApp(dashboard, onRequestPermission = { type ->
+                AtlasApp(dashboard, bluetooth, blePermissionsMissing,
+                    onBlePermissions = {
+                        val missing = permissions.missingForBleScan()
+                        if (missing.isNotEmpty()) permissionRequest.launch(missing.toTypedArray())
+                        blePermissionsMissing = permissions.missingForBleScan()
+                    }, onRequestPermission = { type ->
                     val missing = permissions.missingForState(type)
                     if (missing.isNotEmpty()) permissionRequest.launch(missing.toTypedArray())
                     else dashboard.refresh()
@@ -44,10 +63,12 @@ class MainActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
+        if (::permissions.isInitialized) blePermissionsMissing = permissions.missingForBleScan()
         if (::dashboard.isInitialized) dashboard.refresh()
     }
 
     override fun onStop() {
+        if (::bluetooth.isInitialized) bluetooth.stopAll()
         if (::dashboard.isInitialized) dashboard.pause()
         super.onStop()
     }

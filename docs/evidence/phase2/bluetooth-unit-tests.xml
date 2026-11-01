@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.atlas.BluetoothTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-01T13:45:02.563Z" hostname="REDACTED_HOST" time="0.231">
+  <properties/>
+  <testcase name="completeNameWinsAndControlsAreRemoved" classname="com.example.atlas.BluetoothTest" time="0.057"/>
+  <testcase name="parserIsBoundedForArbitraryUntrustedPackets" classname="com.example.atlas.BluetoothTest" time="0.042"/>
+  <testcase name="uuid128And32UseBluetoothLittleEndian" classname="com.example.atlas.BluetoothTest" time="0.001"/>
+  <testcase name="malformedLengthsDoNotReadPastPacket" classname="com.example.atlas.BluetoothTest" time="0.0"/>
+  <testcase name="historyHasExplicitBoundsAndTracksRepeatedAddress" classname="com.example.atlas.BluetoothTest" time="0.007"/>
+  <testcase name="parserDecodesNamesUuidsManufacturerAndSignedPower" classname="com.example.atlas.BluetoothTest" time="0.001"/>
+  <testcase name="freshnessUsesSourceMonotonicTime" classname="com.example.atlas.BluetoothTest" time="0.0"/>
+  <testcase name="connectionMustBeExplicitAndReferenceObservedConnectableDevice" classname="com.example.atlas.BluetoothTest" time="0.101"/>
+  <testcase name="timeoutClosesScanAndPreservesActualObservation" classname="com.example.atlas.BluetoothTest" time="0.005"/>
+  <testcase name="securityFailureIsNotAnEmptySuccessfulScan" classname="com.example.atlas.BluetoothTest" time="0.005"/>
+  <testcase name="surveyPolicyIncludesLocationWithoutAdvertisingOrBackgroundAccess" classname="com.example.atlas.BluetoothTest" time="0.001"/>
+  <testcase name="stopRejectsLateCallbacksAndRequiresExplicitRestart" classname="com.example.atlas.BluetoothTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

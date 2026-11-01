@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="1" failures="0" errors="0" skipped="0" time="0.000" timestamp="2026-11-01T13:39:25" hostname="localhost">
+  <testsuite name="com.example.atlas.BlePhysicalInstrumentedTest" tests="1" failures="0" errors="0" skipped="0" time="40.946" timestamp="2026-11-01T13:39:25" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel 10 Pro XL" />
+    </properties>
+    <testcase name="realAdvertisementsAndForegroundCleanup" classname="com.example.atlas.BlePhysicalInstrumentedTest" time="40.946" />
+  </testsuite>
+</testsuites>
+

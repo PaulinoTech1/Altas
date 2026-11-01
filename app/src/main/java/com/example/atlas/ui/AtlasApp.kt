@@ -20,6 +20,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,19 +34,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.atlas.model.PermissionState
 import com.example.atlas.model.RadioCapability
 import com.example.atlas.model.RadioType
+import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
 import java.text.DateFormat
 import java.util.Date
 
 @Composable
 fun AtlasApp(
     viewModel: DashboardViewModel,
+    bluetooth: BluetoothViewModel,
+    blePermissionsMissing: List<String>,
+    onBlePermissions: () -> Unit,
     onRequestPermission: (RadioType) -> Unit,
     onAppSettings: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val ble by bluetooth.state.collectAsStateWithLifecycle()
+    val gatt by bluetooth.gatt.state.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableStateOf("Dashboard") }
     BackHandler(page != "Dashboard") { page = "Dashboard" }
     val selected = state.radios.firstOrNull { it.type.name == page }
+    val bluetoothVisible = selected?.type == RadioType.BLUETOOTH
+    DisposableEffect(bluetoothVisible) {
+        onDispose { if (bluetoothVisible) bluetooth.stopAll() }
+    }
     Scaffold { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding).testTag("atlas-content"),
@@ -57,18 +68,23 @@ fun AtlasApp(
                     color = MaterialTheme.colorScheme.primary)
                 Text(selected?.type?.title ?: page, style = MaterialTheme.typography.headlineLarge,
                     modifier = Modifier.semantics { heading() })
-                Text("Native radio diagnostics · Foundation", style = MaterialTheme.typography.bodyMedium)
+                Text("Native radio diagnostics", style = MaterialTheme.typography.bodyMedium)
                 if (page != "Dashboard") TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
             }
             item {
                 Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
-                    Text("Collection inactive. Phase 1 checks hardware and state only.",
+                    Text(if (ble.scanning) "BLE collection active. Leaving Bluetooth stops collection."
+                        else "BLE collection inactive. Wi-Fi, cellular and NFC collectors not implemented.",
                         modifier = Modifier.padding(16.dp))
                 }
             }
             if (state.refreshing) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
             when {
+                selected?.type == RadioType.BLUETOOTH -> bluetoothContent(
+                    selected, bluetooth, ble, gatt, blePermissionsMissing, onBlePermissions,
+                    { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings
+                )
                 selected != null -> item {
                     RadioDetails(selected)
                     if (selected.type == RadioType.BLUETOOTH && selected.permission == PermissionState.REQUIRED) {
@@ -79,14 +95,15 @@ fun AtlasApp(
                     TextButton(onClick = onAppSettings) { Text("App permission settings") }
                 }
                 page == "History" -> item {
-                    Text("No measurements collected", style = MaterialTheme.typography.titleLarge)
-                    Text("Measurement storage, retention and JSON export will be implemented in Phase 6.")
+                    Text(if (ble.history.isEmpty()) "No measurements collected" else "${ble.history.size} BLE observations in memory",
+                        style = MaterialTheme.typography.titleLarge)
+                    Text("BLE session history is available on the Bluetooth screen. Persistent storage and JSON export arrive in Phase 6.")
                 }
                 page == "Settings" -> item {
                     Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
                     Text("Minimum API 31 · Target API 37")
                     Text("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
-                    Text("Collection controls and retention settings become available with acquisition and storage.")
+                    Text("BLE controls are on the Bluetooth screen. History is bounded to 256 addresses and 1,024 observations in memory; persistent retention arrives in Phase 6.")
                     TextButton(onClick = onAppSettings) { Text("App permission settings") }
                 }
                 else -> {
@@ -96,8 +113,8 @@ fun AtlasApp(
                                 Text(radio.type.title, style = MaterialTheme.typography.titleLarge)
                                 Text("Hardware: ${radio.availability.label} · State: ${radio.state.label}")
                                 Text("Permission: ${radio.permission.label}", style = MaterialTheme.typography.bodyMedium)
-                                Text("Collection: ${radio.collection.label}", style = MaterialTheme.typography.bodyMedium)
-                                Text("Last measurement: ${timeLabel(radio.lastMeasurementEpochMillis)}", style = MaterialTheme.typography.bodyMedium)
+                                Text("Collection: ${if (radio.type == RadioType.BLUETOOTH) (if (ble.scanning) "Scanning" else "Idle") else radio.collection.label}", style = MaterialTheme.typography.bodyMedium)
+                                Text("Last measurement: ${timeLabel(if (radio.type == RadioType.BLUETOOTH) ble.history.firstOrNull()?.observedAtMillis else radio.lastMeasurementEpochMillis)}", style = MaterialTheme.typography.bodyMedium)
                                 radio.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                                 TextButton(onClick = { page = radio.type.name }) { Text("Open ${radio.type.title}") }
                             }

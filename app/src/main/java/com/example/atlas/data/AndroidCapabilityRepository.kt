@@ -61,7 +61,7 @@ class AndroidCapabilityRepository(
                         val adapter = app.getSystemService(BluetoothManager::class.java)?.adapter
                         available.copy(
                             state = adapter?.let { enabledState(it.isEnabled) } ?: RadioState.ERROR,
-                            detail = "BLE ${if (ble) "reported" else "not reported"}. No discovery or GATT connection started.",
+                            detail = "BLE ${if (ble) "reported" else "not reported"}. Open Bluetooth for user-controlled scanning and GATT.",
                             sourceApi = "PackageManager / BluetoothAdapter.isEnabled",
                             error = if (adapter == null) "Bluetooth adapter unavailable despite feature declaration" else null
                         )

@@ -18,7 +18,7 @@ enum class RadioState(val label: String) {
 }
 
 enum class CollectionState(val label: String) {
-    NOT_IMPLEMENTED("Not implemented — Phase 1")
+    NOT_IMPLEMENTED("Not implemented")
 }
 
 data class RadioCapability(
