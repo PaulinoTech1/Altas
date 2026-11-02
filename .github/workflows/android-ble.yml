@@ -29,7 +29,7 @@ jobs:
           sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
       - name: Build and test Android app
         working-directory: android
-        run: bash ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-configuration-cache
+        run: bash ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --no-configuration-cache
       - uses: actions/upload-artifact@v4
         with:
           name: atlas-ble-debug-apk
