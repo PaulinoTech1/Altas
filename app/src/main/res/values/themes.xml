@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Atlas" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Light window theme. values-night/themes.xml supplies the dark parent, so the pre-Compose window follows the
+         system theme (DayNight by resource qualifier; no material-components dependency). -->
+    <style name="Theme.Atlas" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/atlas_window_background</item>
+    </style>
 </resources>
