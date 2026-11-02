@@ -23,6 +23,7 @@ data class BluetoothUiState(
     val status: String = "Idle — no BLE scan started",
     val error: String? = null,
     val selectedAddress: String? = null,
+    val isolateSelected: Boolean = false,
     /** [SessionClock] time the running scan started, or null when idle; drives the UI countdown only (B2). */
     val sessionStartedAtMillis: Long? = null,
     val sessionLimitMillis: Long = config.seconds * 1000L
@@ -78,8 +79,20 @@ class BluetoothViewModel(private val scanner: BleScanner, val gatt: GattClient) 
         mutable.value = mutable.value.copy(scanning = false, status = reason, sessionStartedAtMillis = null)
     }
 
-    fun clearHistory() { if (!mutable.value.scanning) { store.clear(); publish() } }
-    fun select(address: String?) { mutable.value = mutable.value.copy(selectedAddress = address) }
+    fun clearHistory() {
+        if (!mutable.value.scanning) {
+            store.clear()
+            mutable.value = mutable.value.copy(selectedAddress = null, isolateSelected = false)
+            publish()
+        }
+    }
+    fun select(address: String?) {
+        mutable.value = mutable.value.copy(selectedAddress = address,
+            isolateSelected = address != null && mutable.value.isolateSelected)
+    }
+    fun setIsolation(enabled: Boolean) {
+        mutable.value = mutable.value.copy(isolateSelected = enabled && mutable.value.selectedAddress != null)
+    }
     fun connect(address: String) {
         if (mutable.value.devices.none { it.latest.address == address && it.latest.connectable }) return
         stop("Stopped for authorized GATT connection")
