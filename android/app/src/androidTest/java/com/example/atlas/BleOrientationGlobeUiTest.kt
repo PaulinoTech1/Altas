@@ -46,6 +46,46 @@ class BleOrientationGlobeUiTest {
         compose.onNodeWithText("1 visible paired samples", substring = true).assertExists()
     }
 
+    @Test fun tappingPointIsolatesItAndShowsDeviceName() {
+        val selected = mutableStateOf<String?>(null)
+        val isolated = mutableStateOf(false)
+        val samples = listOf(
+            BleObservation("target", "AA", 3L, 3L, null, -50, true,
+                Advertisement(name = "Test peripheral"),
+                phoneOrientation = PhoneOrientation(1f, 0f, 0f, 3L), orientationSessionId = "scan"),
+            BleObservation("older", "AA", 2L, 2L, null, -75, true,
+                Advertisement(name = "Test peripheral"),
+                phoneOrientation = PhoneOrientation(0f, 0f, 1f, 2L), orientationSessionId = "scan"),
+            BleObservation("other", "BB", 1L, 1L, null, -80, true,
+                Advertisement(name = "Other peripheral"),
+                phoneOrientation = PhoneOrientation(0f, 1f, 0f, 1L), orientationSessionId = "scan")
+        )
+        compose.setContent {
+            MaterialTheme {
+                BleOrientationGlobe(samples, false, selected.value, null,
+                    isolateSelected = isolated.value,
+                    onIsolationChange = { isolated.value = it },
+                    onSelectAddress = { selected.value = it })
+            }
+        }
+        val plotted = OrientationGlobeMath.project(samples.first(), 0.55f, -0.35f, 1f)!!
+        compose.onNodeWithTag("ble-orientation-globe").performTouchInput {
+            val radius = minOf(width, height) * 0.43f
+            click(Offset(center.x + plotted.x * radius, center.y + plotted.y * radius))
+        }
+        compose.runOnIdle {
+            assertEquals("AA", selected.value)
+            org.junit.Assert.assertTrue(isolated.value)
+        }
+        compose.onNodeWithText("Device name: Test peripheral").assertExists()
+        compose.onNodeWithText("Observed address: AA").assertExists()
+        compose.onNodeWithText("1 visible paired samples", substring = true).assertExists()
+        compose.onNodeWithText("Show other points from this device").performClick()
+        compose.onNodeWithText("2 visible paired samples", substring = true).assertExists()
+        compose.onNodeWithText("Show other signatures").performClick()
+        compose.onNodeWithText("3 visible paired samples", substring = true).assertExists()
+    }
+
     @Test fun tapAndTraversalExposeExactDbm() {
         var chosenAddress: String? = null
         val samples = listOf(
