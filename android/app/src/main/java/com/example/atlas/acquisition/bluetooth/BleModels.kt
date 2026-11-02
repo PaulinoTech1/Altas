@@ -23,6 +23,22 @@ data class Advertisement(
 
 data class ManufacturerData(val companyId: Int, val payloadHex: String)
 
+/** A GNSS fix for the Pixel itself, never a location inferred for a BLE transmitter. */
+data class PhoneGpsFix(
+    val latitude: Double,
+    val longitude: Double,
+    val horizontalAccuracyMeters: Float,
+    val elapsedNanos: Long
+) {
+    /** Match only a previous fix close to the advertisement's monotonic timestamp. */
+    fun matches(observationElapsedNanos: Long): Boolean =
+        latitude.isFinite() && longitude.isFinite() &&
+            latitude in -90.0..90.0 && longitude in -180.0..180.0 &&
+            horizontalAccuracyMeters.isFinite() && horizontalAccuracyMeters >= 0f &&
+            observationElapsedNanos >= elapsedNanos &&
+            observationElapsedNanos - elapsedNanos <= 10_000_000_000L
+}
+
 /** Phone-facing direction in a session-relative frame. It is not a bearing to a BLE transmitter. */
 data class PhoneOrientation(val x: Float, val y: Float, val z: Float, val elapsedNanos: Long)
 
@@ -37,7 +53,8 @@ data class BleObservation(
     val advertisement: Advertisement,
     val sourceApi: String = "BluetoothLeScanner / ScanResult",
     val phoneOrientation: PhoneOrientation? = null,
-    val orientationSessionId: String? = null
+    val orientationSessionId: String? = null,
+    val phoneGpsFix: PhoneGpsFix? = null
 ) {
     fun ageMillis(nowElapsedNanos: Long): Long? = sourceElapsedNanos?.takeIf { it <= nowElapsedNanos }?.let {
         (nowElapsedNanos - it) / 1_000_000
