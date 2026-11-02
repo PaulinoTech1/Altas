@@ -26,7 +26,10 @@ data class NfcUiState(
     val error: String? = null,
     val tags: List<NfcTagReport> = emptyList(),
     val exchanges: List<ApduExchange> = emptyList(),
-    val apduBusy: Boolean = false
+    val apduBusy: Boolean = false,
+    /** [com.example.atlas.model.SessionClock] time the reader started, or null when off; drives the UI countdown only (B2). */
+    val sessionStartedAtMillis: Long? = null,
+    val sessionLimitMillis: Long = NfcViewModel.SESSION_LIMIT_MILLIS
 )
 
 /** Only user-entered, bounded ISO-DEP APDUs are accepted. No payment or credential presets. */

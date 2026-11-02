@@ -2,6 +2,7 @@ package com.example.atlas.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,41 +35,58 @@ fun LazyListScope.bluetoothContent(
     state: BluetoothUiState,
     gatt: GattState,
     missingPermissions: List<String>,
+    sessionNotice: String,
     requestPermissions: () -> Unit,
     requestStatePermission: () -> Unit,
     openSettings: () -> Unit
 ) {
-    item {
-        SectionCard {
-            Pairs {
-                Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
-                Text("State: ${radio.state.label}")
-                val missingLabels = buildList {
-                    if (missingPermissions.any { it.contains("BLUETOOTH_") }) add("Nearby devices")
-                    if (missingPermissions.any { it.endsWith("_LOCATION") }) add("Precise location")
+    val permissionsGranted = missingPermissions.isEmpty()
+    // B1: control first (fixes "Start BLE scan" sitting below the first screen), then access, results, caveats.
+    radioControlItem(state.scanning) {
+        RadioControlCard(
+            active = state.scanning, activity = "Scanning",
+            startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
+            counts = "${state.devices.size} devices · ${state.receivedCount} observations",
+            notice = sessionNotice,
+            summary = {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
+                    Text("State: ${radio.state.label}", style = MaterialTheme.typography.titleMedium)
                 }
-                Text("Survey permissions: ${if (missingLabels.isEmpty()) "Granted" else "Needed: ${missingLabels.joinToString()}"}")
             }
-            if (radio.permission == PermissionState.REQUIRED) {
-                Button(onClick = requestStatePermission) { Text("Check Bluetooth state") }
-            }
-            ExpandableNotice("Scanning needs Nearby devices and precise location.",
-                "RF surveying uses Nearby devices and precise location. Granting permission does not start collection.",
-                showFull = missingPermissions.isNotEmpty())
-            OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
-            TextButton(onClick = openSettings) { Text("App permission settings") }
-            if (missingPermissions.isNotEmpty()) PermissionGuidance()
-        }
-    }
-    item {
-        ItemColumn {
-            SectionTitle("BLE collection")
-            BleControls(state, viewModel, missingPermissions.isEmpty())
+        ) {
+            BleControls(state, viewModel, permissionsGranted)
             StatusText(state.status)
             state.error?.let { DiagnosticNotice("BLE", it) }
+        }
+    }
+    item(key = "ble-access") {
+        SectionCard {
+            val missingLabels = buildList {
+                if (missingPermissions.any { it.contains("BLUETOOTH_") }) add("Nearby devices")
+                if (missingPermissions.any { it.endsWith("_LOCATION") }) add("Precise location")
+            }
+            val permissionLine = "Survey permissions: ${if (missingLabels.isEmpty()) "Granted" else "Needed: ${missingLabels.joinToString()}"}"
+            if (permissionsGranted && radio.permission != PermissionState.REQUIRED) {
+                AccessGrantedRow(permissionLine) {
+                    OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
+                }
+            } else {
+                Text(permissionLine, style = MaterialTheme.typography.titleSmall)
+                if (radio.permission == PermissionState.REQUIRED) {
+                    Button(onClick = requestStatePermission) { Text("Check Bluetooth state") }
+                }
+                ExpandableNotice(BLE_RATIONALE_SUMMARY, BLE_RATIONALE, showFull = missingPermissions.isNotEmpty())
+                OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
+                TextButton(onClick = openSettings) { Text("App permission settings") }
+                if (missingPermissions.isNotEmpty()) PermissionGuidance()
+            }
+        }
+    }
+    item(key = "ble-results") {
+        ItemColumn {
+            SectionTitle("BLE collection")
             Text("${state.devices.size} retained addresses · ${state.receivedCount} received observations · ${state.history.size}/1024 history entries")
-            ExpandableNotice("Scans never restart automatically; a 10-second cooldown applies between scans.",
-                "No automatic restart. 10-second restart cooldown; Android may impose further limits. Addresses can rotate. This is not lossless packet capture.")
             OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
         }
     }
@@ -118,23 +136,35 @@ fun LazyListScope.bluetoothContent(
                 style = MaterialTheme.typography.bodySmall)
         }
     }
+    aboutCollection("ble-about", buildList {
+        if (permissionsGranted && radio.permission != PermissionState.REQUIRED) add(BLE_RATIONALE)
+        add("No automatic restart. 10-second restart cooldown; Android may impose further limits. Addresses can rotate. This is not lossless packet capture.")
+    })
 }
+
+private const val BLE_RATIONALE_SUMMARY = "Scanning needs Nearby devices and precise location."
+private const val BLE_RATIONALE = "RF surveying uses Nearby devices and precise location. Granting permission does not start collection."
 
 @Composable
 private fun BleControls(state: BluetoothUiState, viewModel: BluetoothViewModel, permissionsGranted: Boolean) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    if (state.scanning) {
+        Button(onClick = { viewModel.stop() }) { Text("Stop BLE scan") }
+        // Configuration collapses to one line while a scan runs; chips return when idle.
+        Text("${state.config.seconds} s · ${state.config.mode.label}", style = MaterialTheme.typography.bodySmall)
+    } else {
+        Button(onClick = viewModel::start, enabled = permissionsGranted) { Text("Start BLE scan") }
+        if (!permissionsGranted) Explanation("Grant survey permissions under Access to start.")
+        // B1: one wrapping row instead of three stacked chips, so Start stays on the first screen.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(10, 20, 30).forEach { seconds ->
-                FilterChip(selected = state.config.seconds == seconds, leadingIcon = chipCheck(state.config.seconds == seconds), enabled = !state.scanning,
+                FilterChip(selected = state.config.seconds == seconds, leadingIcon = chipCheck(state.config.seconds == seconds),
                     onClick = { viewModel.configure(state.config.copy(seconds = seconds)) }, label = { Text("${seconds}s") })
             }
+            BleScanMode.entries.forEach { mode ->
+                FilterChip(selected = state.config.mode == mode, leadingIcon = chipCheck(state.config.mode == mode),
+                    onClick = { viewModel.configure(state.config.copy(mode = mode)) }, label = { Text(mode.label) })
+            }
         }
-        BleScanMode.entries.forEach { mode ->
-            FilterChip(selected = state.config.mode == mode, leadingIcon = chipCheck(state.config.mode == mode), enabled = !state.scanning,
-                onClick = { viewModel.configure(state.config.copy(mode = mode)) }, label = { Text(mode.label) })
-        }
-        if (state.scanning) Button(onClick = { viewModel.stop() }) { Text("Stop BLE scan") }
-        else Button(onClick = viewModel::start, enabled = permissionsGranted) { Text("Start BLE scan") }
     }
 }
 

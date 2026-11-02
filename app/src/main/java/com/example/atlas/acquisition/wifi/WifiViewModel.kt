@@ -3,6 +3,7 @@ package com.example.atlas.acquisition.wifi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.atlas.model.SessionClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -23,7 +24,10 @@ data class WifiUiState(
     val scanBroadcasts: Int = 0,
     val updatedBroadcasts: Int = 0,
     val selectedBssid: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    /** [SessionClock] time the running survey started, or null when idle; drives the UI countdown only (B2). */
+    val sessionStartedAtMillis: Long? = null,
+    val sessionLimitMillis: Long = WifiViewModel.SESSION_LIMIT_MILLIS
 )
 
 class WifiViewModel(private val repository: WifiSurveyRepository) : ViewModel() {
@@ -35,10 +39,11 @@ class WifiViewModel(private val repository: WifiSurveyRepository) : ViewModel() 
 
     fun start() {
         if (session?.isCompleted == false) return
-        mutable.value = mutable.value.copy(collecting = true, status = "Survey active (60-second maximum)", connections = emptyList(), error = null)
+        mutable.value = mutable.value.copy(collecting = true, status = "Survey active (60-second maximum)", connections = emptyList(), error = null,
+            sessionStartedAtMillis = SessionClock.nowMillis())
         session = viewModelScope.launch {
             try {
-                withTimeout(60_000) {
+                withTimeout(SESSION_LIMIT_MILLIS) {
                     repository.survey().collect { event ->
                         when (event) {
                             is WifiEvent.Policy -> mutable.value = mutable.value.copy(osScanThrottlingEnabled = event.osScanThrottlingEnabled)
@@ -63,7 +68,7 @@ class WifiViewModel(private val repository: WifiSurveyRepository) : ViewModel() 
             catch (failure: Exception) { mutable.value = mutable.value.copy(status = "Survey failed", error = errorLabel(failure)) }
             finally {
                 requestJob?.cancel()
-                mutable.value = mutable.value.copy(collecting = false)
+                mutable.value = mutable.value.copy(collecting = false, sessionStartedAtMillis = null)
             }
         }
     }
@@ -82,7 +87,7 @@ class WifiViewModel(private val repository: WifiSurveyRepository) : ViewModel() 
 
     fun stop(reason: String = "Stopped by user — retained snapshots are not live") {
         requestJob?.cancel(); session?.cancel()
-        mutable.value = mutable.value.copy(collecting = false, status = reason)
+        mutable.value = mutable.value.copy(collecting = false, status = reason, sessionStartedAtMillis = null)
     }
     fun select(bssid: String?) { mutable.value = mutable.value.copy(selectedBssid = bssid) }
     fun clear() { if (!mutable.value.collecting) { store.clear(); mutable.value = WifiUiState() } }
@@ -93,6 +98,7 @@ class WifiViewModel(private val repository: WifiSurveyRepository) : ViewModel() 
         is IllegalStateException -> failure.message ?: "Wi-Fi service unavailable."
         else -> "Wi-Fi survey failed (${failure.javaClass.simpleName})."
     }
+    companion object { const val SESSION_LIMIT_MILLIS = 60_000L }
     class Factory(private val repository: WifiSurveyRepository) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(WifiViewModel::class.java))

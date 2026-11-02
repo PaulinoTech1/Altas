@@ -154,7 +154,10 @@ fun AtlasApp(
                     null -> null
                 }
             }
-            if (sessionMessage != null || idleMessage != null) item(key = "session-banner") {
+            // B1: on a radio screen the same line sits inside that screen's control card, next to Start/Stop.
+            val radioNotice = sessionMessage ?: idleMessage.orEmpty()
+            val radioScreen = selected?.type != null && page != "Project"
+            if (!radioScreen && (sessionMessage != null || idleMessage != null)) item(key = "session-banner") {
                 AtlasSessionBanner(active = sessionMessage != null, message = sessionMessage ?: idleMessage.orEmpty())
             }
             if (state.refreshing) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
@@ -162,18 +165,18 @@ fun AtlasApp(
             when {
                 page == "Project" -> projectContent()
                 selected?.type == RadioType.BLUETOOTH -> bluetoothContent(
-                    selected, bluetooth, ble, gatt, blePermissionsMissing, onBlePermissions,
+                    selected, bluetooth, ble, gatt, blePermissionsMissing, radioNotice, onBlePermissions,
                     { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings
                 )
                 selected?.type == RadioType.WIFI -> wifiContent(
-                    selected, wifiSurvey, wifi, wifiPermissionsMissing, wifiNowMicros,
+                    selected, wifiSurvey, wifi, wifiPermissionsMissing, wifiNowMicros, radioNotice,
                     onWifiPermissions, onAppSettings
                 )
                 selected?.type == RadioType.CELLULAR -> cellularContent(
-                    selected, cellular, cell, cellularPermissionsMissing, wifiNowMicros / 1000,
+                    selected, cellular, cell, cellularPermissionsMissing, wifiNowMicros / 1000, radioNotice,
                     onCellularPermissions, onAppSettings
                 )
-                selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity)
+                selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity, radioNotice)
                 selected != null -> item {
                     ItemColumn {
                         RadioDetails(selected)

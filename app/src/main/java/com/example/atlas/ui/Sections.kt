@@ -3,6 +3,7 @@ package com.example.atlas.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -74,4 +76,14 @@ fun ExpandableNotice(summary: String, details: String, modifier: Modifier = Modi
 @Composable
 fun StatusText(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier.semantics { liveRegion = LiveRegionMode.Polite })
+}
+
+/** B1: access when everything is granted — one status line and the review button, wrapping on narrow screens. */
+@Composable
+fun AccessGrantedRow(line: String, action: @Composable () -> Unit) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+        Text(line)
+        action()
+    }
 }

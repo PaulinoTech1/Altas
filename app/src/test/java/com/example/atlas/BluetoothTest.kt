@@ -102,8 +102,12 @@ class BluetoothTest {
         }, FakeGatt())
         vm.start(); runCurrent()
         assertTrue(vm.state.value.scanning)
+        // B2: the countdown fields are set for the running scan and cleared when it ends.
+        assertNotNull(vm.state.value.sessionStartedAtMillis)
+        assertEquals(10_000L, vm.state.value.sessionLimitMillis)
         advanceTimeBy(10_001); runCurrent()
         assertFalse(vm.state.value.scanning)
+        assertNull(vm.state.value.sessionStartedAtMillis)
         assertTrue(closed)
         assertEquals("Scan time limit reached", vm.state.value.status)
         assertEquals(1, vm.state.value.devices.size)

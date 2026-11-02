@@ -3,6 +3,7 @@ package com.example.atlas.acquisition.cellular
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.atlas.model.SessionClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -18,7 +19,10 @@ data class CellularUiState(
     val cells: CellBatch? = null, val signal: SignalReport? = null, val service: ServiceReport? = null,
     val display: DisplayReport? = null, val request: CellUpdateResult? = null,
     val history: List<CellBatch> = emptyList(), val signalHistory: List<SignalReport> = emptyList(),
-    val eventCount: Long = 0, val error: String? = null
+    val eventCount: Long = 0, val error: String? = null,
+    /** [SessionClock] time the running collection started, or null when idle; drives the UI countdown only (B2). */
+    val sessionStartedAtMillis: Long? = null,
+    val sessionLimitMillis: Long = CellularViewModel.SESSION_LIMIT_MILLIS
 )
 
 class CellularViewModel(private val repository: CellularRepository) : ViewModel() {
@@ -31,10 +35,11 @@ class CellularViewModel(private val repository: CellularRepository) : ViewModel(
         if (session?.isCompleted == false) return
         val selected = mutable.value.selectedId
         mutable.value = mutable.value.copy(collecting = true, status = "Cellular collection active (60-second maximum)",
-            cells = null, signal = null, service = null, display = null, request = null, error = null)
+            cells = null, signal = null, service = null, display = null, request = null, error = null,
+            sessionStartedAtMillis = SessionClock.nowMillis())
         session = viewModelScope.launch {
             try {
-                withTimeout(60_000) {
+                withTimeout(SESSION_LIMIT_MILLIS) {
                     repository.observe(selected).collect { event ->
                         mutable.value = mutable.value.copy(eventCount = mutable.value.eventCount + 1)
                         when (event) {
@@ -55,7 +60,7 @@ class CellularViewModel(private val repository: CellularRepository) : ViewModel(
             } catch (_: TimeoutCancellationException) { mutable.value = mutable.value.copy(status = "Cellular session time limit reached") }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { mutable.value = mutable.value.copy(status = "Cellular collection failed", error = errorLabel(failure)) }
-            finally { update?.cancel(); finishPendingRequest(); mutable.value = mutable.value.copy(collecting = false) }
+            finally { update?.cancel(); finishPendingRequest(); mutable.value = mutable.value.copy(collecting = false, sessionStartedAtMillis = null) }
         }
     }
 
@@ -82,7 +87,7 @@ class CellularViewModel(private val repository: CellularRepository) : ViewModel(
     fun stop(reason: String = "Stopped — retained reports are snapshots") {
         update?.cancel(); session?.cancel()
         finishPendingRequest()
-        mutable.value = mutable.value.copy(collecting = false, status = reason)
+        mutable.value = mutable.value.copy(collecting = false, status = reason, sessionStartedAtMillis = null)
     }
     private fun finishPendingRequest() {
         if (mutable.value.request?.status == CellRequestStatus.PENDING) mutable.value = mutable.value.copy(
@@ -101,6 +106,7 @@ class CellularViewModel(private val repository: CellularRepository) : ViewModel(
         is IllegalStateException -> failure.message ?: "Telephony service unavailable."
         else -> "Cellular operation failed (${failure.javaClass.simpleName})."
     }
+    companion object { const val SESSION_LIMIT_MILLIS = 60_000L }
     class Factory(private val repository: CellularRepository) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(CellularViewModel::class.java))

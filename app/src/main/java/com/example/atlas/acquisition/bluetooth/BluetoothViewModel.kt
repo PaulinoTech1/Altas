@@ -3,6 +3,7 @@ package com.example.atlas.acquisition.bluetooth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.atlas.model.SessionClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -19,7 +20,10 @@ data class BluetoothUiState(
     val receivedCount: Long = 0,
     val status: String = "Idle — no BLE scan started",
     val error: String? = null,
-    val selectedAddress: String? = null
+    val selectedAddress: String? = null,
+    /** [SessionClock] time the running scan started, or null when idle; drives the UI countdown only (B2). */
+    val sessionStartedAtMillis: Long? = null,
+    val sessionLimitMillis: Long = config.seconds * 1000L
 )
 
 class BluetoothViewModel(private val scanner: BleScanner, val gatt: GattClient) : ViewModel() {
@@ -35,7 +39,8 @@ class BluetoothViewModel(private val scanner: BleScanner, val gatt: GattClient) 
     fun start() {
         if (scanJob?.isCompleted == false) return
         val config = mutable.value.config
-        mutable.value = mutable.value.copy(scanning = true, status = "Scanning for ${config.seconds} seconds", error = null)
+        mutable.value = mutable.value.copy(scanning = true, status = "Scanning for ${config.seconds} seconds", error = null,
+            sessionStartedAtMillis = SessionClock.nowMillis(), sessionLimitMillis = config.seconds * 1000L)
         scanJob = viewModelScope.launch {
             var lastPublishNanos = 0L
             try {
@@ -60,7 +65,7 @@ class BluetoothViewModel(private val scanner: BleScanner, val gatt: GattClient) 
                     else -> "BLE operation failed (${failure.javaClass.simpleName}). Stop and review hardware/permissions."
                 })
             } finally {
-                mutable.value = mutable.value.copy(scanning = false)
+                mutable.value = mutable.value.copy(scanning = false, sessionStartedAtMillis = null)
                 publish()
             }
         }
@@ -68,7 +73,7 @@ class BluetoothViewModel(private val scanner: BleScanner, val gatt: GattClient) 
 
     fun stop(reason: String = "Stopped by user") {
         scanJob?.cancel()
-        mutable.value = mutable.value.copy(scanning = false, status = reason)
+        mutable.value = mutable.value.copy(scanning = false, status = reason, sessionStartedAtMillis = null)
     }
 
     fun clearHistory() { if (!mutable.value.scanning) { store.clear(); publish() } }

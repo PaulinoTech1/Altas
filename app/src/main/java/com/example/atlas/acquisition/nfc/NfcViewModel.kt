@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.atlas.acquisition.bluetooth.hex
+import com.example.atlas.model.SessionClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -52,8 +53,9 @@ class NfcViewModel(private val reader: AndroidNfcReader) : ViewModel() {
                 }
             }
             activity = WeakReference(owner)
-            mutable.update { it.copy(status = "${if (readNdef) "NDEF" else "Metadata-only"} reader active for up to 60 seconds. Hold an authorized tag near the phone.") }
-            timeoutJob = viewModelScope.launch { delay(60_000); stop("Reader time limit reached") }
+            mutable.update { it.copy(status = "${if (readNdef) "NDEF" else "Metadata-only"} reader active for up to 60 seconds. Hold an authorized tag near the phone.",
+                sessionStartedAtMillis = SessionClock.nowMillis()) }
+            timeoutJob = viewModelScope.launch { delay(SESSION_LIMIT_MILLIS); stop("Reader time limit reached") }
         } catch (failure: Exception) {
             mutable.update { it.copy(reading = false, status = "Reader unavailable", error = failure.message ?: failure.javaClass.simpleName) }
         }
@@ -96,13 +98,14 @@ class NfcViewModel(private val reader: AndroidNfcReader) : ViewModel() {
         }
         activity = null
         lastTag = null
-        mutable.update { it.copy(reading = false, apduBusy = false, status = reason) }
+        mutable.update { it.copy(reading = false, apduBusy = false, status = reason, sessionStartedAtMillis = null) }
     }
 
     fun clear() { if (!mutable.value.reading) mutable.update { it.copy(tags = emptyList(), exchanges = emptyList()) } }
 
     override fun onCleared() { stop("Reader closed") }
 
+    companion object { const val SESSION_LIMIT_MILLIS = 60_000L }
     class Factory(private val reader: AndroidNfcReader) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(NfcViewModel::class.java))

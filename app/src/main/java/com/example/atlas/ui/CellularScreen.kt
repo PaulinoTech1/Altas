@@ -2,6 +2,7 @@ package com.example.atlas.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
@@ -23,39 +24,52 @@ import java.util.Date
 
 fun LazyListScope.cellularContent(
     radio: RadioCapability, viewModel: CellularViewModel, state: CellularUiState,
-    missingPermissions: List<String>, nowElapsedMillis: Long,
+    missingPermissions: List<String>, nowElapsedMillis: Long, sessionNotice: String,
     requestPermissions: () -> Unit, openSettings: () -> Unit
 ) {
-    item {
-        SectionCard {
-            Pairs {
-                Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
-                Text("Access: ${if (missingPermissions.isEmpty()) "Granted" else "Phone status and precise location required"}")
+    val permissionsGranted = missingPermissions.isEmpty()
+    radioControlItem(state.collecting) {
+        RadioControlCard(
+            active = state.collecting, activity = "Collecting",
+            startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
+            counts = "${state.cells?.rows?.size ?: 0} cells · ${state.eventCount} reports",
+            notice = sessionNotice,
+            summary = { Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium) }
+        ) {
+            if (state.collecting) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = { viewModel.stop() }) { Text("Stop cellular collection") }
+                    OutlinedButton(onClick = viewModel::requestUpdate, enabled = state.selectedId != null && state.request?.status != CellRequestStatus.PENDING) { Text("Request cell update") }
+                }
+            } else {
+                Button(onClick = viewModel::start, enabled = permissionsGranted) { Text("Start cellular collection") }
+                if (!permissionsGranted) Explanation("Grant phone status and precise location under Access to start.")
             }
-            ExpandableNotice("Cell measurements can reveal location; no phone numbers or SIM identifiers are requested.",
-                "Cell measurements can reveal location. Phone status is used for subscription and radio callbacks. No phone numbers, IMSI, IMEI or ICCID are requested.",
-                showFull = missingPermissions.isNotEmpty())
-            OutlinedButton(onClick = requestPermissions) { Text("Review cellular permissions") }
-            TextButton(onClick = openSettings) { Text("App permission settings") }
-            if (missingPermissions.isNotEmpty()) PermissionGuidance()
+            StatusText(state.status)
+            state.error?.let { DiagnosticNotice("CELL", it) }
+            state.request?.let {
+                if (it.status == CellRequestStatus.LOCAL_COOLDOWN || it.status == CellRequestStatus.TIMED_OUT || it.status == CellRequestStatus.MODEM_ERROR)
+                    DiagnosticNotice("CELL", "${it.status.name}: ${it.message}")
+                else Text(it.message)
+            }
         }
     }
-    item { ItemColumn {
-        if (state.collecting) {
-            Button(onClick = { viewModel.stop() }) { Text("Stop cellular collection") }
-            OutlinedButton(onClick = viewModel::requestUpdate, enabled = state.selectedId != null && state.request?.status != CellRequestStatus.PENDING) { Text("Request cell update") }
-        } else Button(onClick = viewModel::start, enabled = missingPermissions.isEmpty()) { Text("Start cellular collection") }
-        StatusText(state.status)
-        state.error?.let { DiagnosticNotice("CELL", it) }
-        state.request?.let {
-            if (it.status == CellRequestStatus.LOCAL_COOLDOWN || it.status == CellRequestStatus.TIMED_OUT || it.status == CellRequestStatus.MODEM_ERROR)
-                DiagnosticNotice("CELL", "${it.status.name}: ${it.message}")
-            else Text(it.message)
+    item(key = "cell-access") {
+        SectionCard {
+            val permissionLine = "Access: ${if (permissionsGranted) "Granted" else "Phone status and precise location required"}"
+            if (permissionsGranted) {
+                AccessGrantedRow(permissionLine) {
+                    OutlinedButton(onClick = requestPermissions) { Text("Review cellular permissions") }
+                }
+            } else {
+                Text(permissionLine, style = MaterialTheme.typography.titleSmall)
+                ExpandableNotice(CELL_RATIONALE_SUMMARY, CELL_RATIONALE, showFull = true)
+                OutlinedButton(onClick = requestPermissions) { Text("Review cellular permissions") }
+                TextButton(onClick = openSettings) { Text("App permission settings") }
+                PermissionGuidance()
+            }
         }
-        ExpandableNotice("Sessions stop after 60 seconds; refresh requests are at least 30 seconds apart.",
-            "60-second sessions; refresh requests at least 30 seconds apart. Android may rate-limit or return cache. Stopping unregisters Atlas callbacks; it cannot cancel a modem request already submitted.")
-        OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear cellular history") }
-    } }
+    }
     item { ItemColumn {
         SectionTitle("Subscription context")
         Text(state.scopeMessage)
@@ -135,8 +149,16 @@ fun LazyListScope.cellularContent(
         state.signalHistory.take(8).forEach { report ->
             Text("${cellTime(report.receivedAtMillis)} · subscription ${report.subscriptionContext ?: "unavailable"} · ${report.signals.joinToString { signal -> "${signal.rat}: ${signal.metrics.joinToString { metric -> "${metric.name} ${metric.value ?: "unavailable"} ${metric.unit}" }}" }}", style = MaterialTheme.typography.bodySmall)
         }
+        OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear cellular history") }
     } }
+    aboutCollection("cell-about", buildList {
+        if (permissionsGranted) add(CELL_RATIONALE)
+        add("60-second sessions; refresh requests at least 30 seconds apart. Android may rate-limit or return cache. Stopping unregisters Atlas callbacks; it cannot cancel a modem request already submitted.")
+    })
 }
+
+private const val CELL_RATIONALE_SUMMARY = "Cell measurements can reveal location; no phone numbers or SIM identifiers are requested."
+private const val CELL_RATIONALE = "Cell measurements can reveal location. Phone status is used for subscription and radio callbacks. No phone numbers, IMSI, IMEI or ICCID are requested."
 
 @Composable
 private fun Metrics(metrics: List<CellularMetric>) {

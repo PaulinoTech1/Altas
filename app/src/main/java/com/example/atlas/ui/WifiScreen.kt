@@ -3,6 +3,7 @@ package com.example.atlas.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,44 +33,61 @@ fun LazyListScope.wifiContent(
     state: WifiUiState,
     missingPermissions: List<String>,
     nowElapsedMicros: Long,
+    sessionNotice: String,
     requestPermissions: () -> Unit,
     openSettings: () -> Unit
 ) {
-    item {
-        SectionCard {
-            Pairs {
-                Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
-                Text("Capability check: ${radio.state.label}")
-                Text("Survey permission: ${if (missingPermissions.isEmpty()) "Granted" else "Precise location needed"}")
+    val permissionsGranted = missingPermissions.isEmpty()
+    radioControlItem(state.collecting) {
+        RadioControlCard(
+            active = state.collecting, activity = "Surveying",
+            startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
+            counts = "${state.rows.size} access points · ${state.history.size} samples",
+            notice = sessionNotice,
+            summary = {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
+                    Text("Capability check: ${radio.state.label}", style = MaterialTheme.typography.titleMedium)
+                }
             }
-            ExpandableNotice("Wi-Fi surveying can reveal location.",
-                "Wi-Fi surveying can reveal location. Android requires precise location permission and enabled location services.",
-                showFull = missingPermissions.isNotEmpty())
-            OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
-            TextButton(onClick = openSettings) { Text("App permission settings") }
-            if (missingPermissions.isNotEmpty()) PermissionGuidance()
+        ) {
+            if (state.collecting) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = { viewModel.stop() }) { Text("Stop Wi-Fi survey") }
+                    OutlinedButton(onClick = viewModel::requestScan) { Text("Request Wi-Fi scan") }
+                }
+            } else {
+                Button(onClick = viewModel::start, enabled = permissionsGranted) { Text("Start Wi-Fi survey") }
+                if (!permissionsGranted) Explanation("Grant precise location under Access to start.")
+            }
+            StatusText(state.status)
+            state.request?.let {
+                if (it.status == WifiRequestStatus.ACCEPTED) Text(it.message)
+                else DiagnosticNotice("WIFI", "${it.status.name}: ${it.message}")
+            }
+            state.error?.let { DiagnosticNotice("WIFI", it) }
+        }
+    }
+    item(key = "wifi-access") {
+        SectionCard {
+            val permissionLine = "Survey permission: ${if (permissionsGranted) "Granted" else "Precise location needed"}"
+            if (permissionsGranted) {
+                AccessGrantedRow(permissionLine) {
+                    OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
+                }
+            } else {
+                Text(permissionLine, style = MaterialTheme.typography.titleSmall)
+                ExpandableNotice(WIFI_RATIONALE_SUMMARY, WIFI_RATIONALE, showFull = true)
+                OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
+                TextButton(onClick = openSettings) { Text("App permission settings") }
+                PermissionGuidance()
+            }
         }
     }
     item { ItemColumn {
-        if (state.collecting) {
-            Button(onClick = { viewModel.stop() }) { Text("Stop Wi-Fi survey") }
-            OutlinedButton(onClick = viewModel::requestScan) { Text("Request Wi-Fi scan") }
-        } else Button(onClick = viewModel::start, enabled = missingPermissions.isEmpty()) { Text("Start Wi-Fi survey") }
-        StatusText(state.status)
-        state.request?.let {
-            if (it.status == WifiRequestStatus.ACCEPTED) Text(it.message)
-            else DiagnosticNotice("WIFI", "${it.status.name}: ${it.message}")
-        }
-        Text("Android scan throttling: ${when (state.osScanThrottlingEnabled) { true -> "Enabled"; false -> "Disabled"; null -> "Not reported" }}")
-        state.error?.let { DiagnosticNotice("WIFI", it) }
-        ExpandableNotice("Sessions stop after 60 seconds; scan requests are rate limited.",
-            "Sessions stop after 60 seconds. No automatic retries. Requests are spaced by at least 30 seconds and limited to four per two minutes; Android can further restrict scans.")
-        ExpandableNotice("Stop ends Atlas collection but cannot cancel a scan Android already started.",
-            "Stop unregisters Atlas callbacks. Android provides no cancellation API for a hardware scan already requested.")
-        OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear Wi-Fi history") }
-    } }
-    item { ItemColumn {
         SectionTitle("Survey summary")
+        Text("Android scan throttling: ${when (state.osScanThrottlingEnabled) { true -> "Enabled"; false -> "Disabled"; null -> "Not reported" }}")
+        OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear Wi-Fi history") }
         Text("${state.rows.size} displayed AP rows / ${state.totalRows} reported · ${state.history.size}/1024 distinct source samples retained")
         Text("${state.updatedBroadcasts} updated platform broadcasts / ${state.scanBroadcasts} total. Broadcasts are shared across apps; an update is not proof this app caused the scan.")
         state.rows.groupingBy { WifiValues.band(it.frequencyMhz) }.eachCount().toSortedMap().forEach { (band, count) -> Text("$band: $count reported rows") }
@@ -125,7 +143,15 @@ fun LazyListScope.wifiContent(
             }
         }
     }
+    aboutCollection("wifi-about", buildList {
+        if (permissionsGranted) add(WIFI_RATIONALE)
+        add("Sessions stop after 60 seconds. No automatic retries. Requests are spaced by at least 30 seconds and limited to four per two minutes; Android can further restrict scans.")
+        add("Stop unregisters Atlas callbacks. Android provides no cancellation API for a hardware scan already requested.")
+    })
 }
+
+private const val WIFI_RATIONALE_SUMMARY = "Wi-Fi surveying can reveal location."
+private const val WIFI_RATIONALE = "Wi-Fi surveying can reveal location. Android requires precise location permission and enabled location services."
 
 @Composable
 private fun SignalHistory(rows: List<WifiObservation>) {

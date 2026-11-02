@@ -3,6 +3,7 @@ package com.example.atlas.ui
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
@@ -28,15 +29,18 @@ import com.example.atlas.model.RadioCapability
 import java.text.DateFormat
 import java.util.Date
 
-fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: NfcUiState, activity: Activity) {
-    item {
+fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: NfcUiState, activity: Activity, sessionNotice: String) {
+    radioControlItem(state.reading) {
         var confirmNdef by rememberSaveable { mutableStateOf(false) }
-        ItemColumn {
-            Text("Hardware: ${radio.availability.label} · ${radio.state.label}", style = MaterialTheme.typography.titleMedium)
-            ExpandableNotice("Hold a tag you own or are authorized to inspect near the phone.",
-                "Reader mode operates only while this screen is active. Hold a tag you own or are authorized to inspect near the phone. Metadata-only mode does not request NDEF content.")
+        RadioControlCard(
+            active = state.reading, activity = "Reading",
+            startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
+            counts = "${state.tags.size} tags this session",
+            notice = sessionNotice,
+            summary = { Text("Hardware: ${radio.availability.label} · ${radio.state.label}", style = MaterialTheme.typography.titleMedium) }
+        ) {
             if (state.reading) Button(onClick = { vm.stop() }) { Text("Stop NFC reader") }
-            else {
+            else FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Button(onClick = { vm.start(activity) }) { Text("Start NFC reader") }
                 OutlinedButton(onClick = { confirmNdef = true }) { Text("Read NDEF on an authorized tag") }
             }
@@ -46,14 +50,19 @@ fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: Nf
                 dismissButton = { TextButton(onClick = { confirmNdef = false }) { Text("Cancel") } })
             StatusText(state.status)
             state.error?.let { DiagnosticNotice("NFC", it) }
-            ExpandableNotice("Reader sessions stop after 60 seconds or when the app leaves the foreground.",
-                "Reader sessions stop after 60 seconds or when the app leaves the foreground. Android does not grant access to protected secure-element credentials.")
-            OutlinedButton(onClick = vm::clear, enabled = !state.reading) { Text("Clear NFC history") }
+        }
+    }
+    // NFC has no runtime permission; its authorization notice takes the place of the access card.
+    item(key = "nfc-access") {
+        SectionCard {
+            ExpandableNotice("Hold a tag you own or are authorized to inspect near the phone.",
+                "Reader mode operates only while this screen is active. Hold a tag you own or are authorized to inspect near the phone. Metadata-only mode does not request NDEF content.")
         }
     }
     item { ItemColumn {
         SectionTitle("Detected tags")
         if (state.tags.isEmpty()) Explanation("No physical tag has been read in this session.")
+        else OutlinedButton(onClick = vm::clear, enabled = !state.reading) { Text("Clear NFC history") }
     } }
     itemsIndexed(state.tags, key = { index, tag -> "$index-${tag.observedAtMillis}-${tag.idHex}" }) { _, tag ->
         Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
@@ -75,6 +84,8 @@ fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: Nf
         }
     }
     item { ApduControls(vm, state) }
+    aboutCollection("nfc-about", listOf(
+        "Reader sessions stop after 60 seconds or when the app leaves the foreground. Android does not grant access to protected secure-element credentials."))
 }
 
 @Composable
