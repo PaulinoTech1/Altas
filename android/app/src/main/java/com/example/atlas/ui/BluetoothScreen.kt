@@ -104,17 +104,6 @@ fun LazyListScope.bluetoothContent(
             OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
         }
     }
-    if (replay == null && state.selectedAddress != null) item(key = "ble-isolation") {
-        ItemColumn {
-            SectionTitle("Selected BLE signature")
-            Text("Observed address: ${state.selectedAddress}. Addresses can rotate or be spoofed.")
-            OutlinedButton(onClick = { viewModel.setIsolation(!state.isolateSelected) }) {
-                Text(if (state.isolateSelected) "Show all signatures" else "Isolate selected signature")
-            }
-            if (state.isolateSelected) Text("Other addresses are hidden from the radar, 3D view and device list. Collection continues normally.",
-                style = MaterialTheme.typography.bodySmall)
-        }
-    }
     item {
         ItemColumn {
             SectionTitle("GATT: ${gatt.status}")
@@ -159,7 +148,8 @@ fun LazyListScope.bluetoothContent(
     }
     item(key = "ble-orientation-globe") {
         BleOrientationGlobe(state.history, state.scanning, state.selectedAddress, state.sessionStartedAtMillis,
-            isolateSelected = state.isolateSelected, onSelectAddress = viewModel::select)
+            isolateSelected = state.isolateSelected, onIsolationChange = viewModel::setIsolation,
+            onSelectAddress = viewModel::select)
     }
     item(key = "ble-signal-locator") {
         BleSignalLocator(state.history, state.selectedAddress, state.scanning, state.sessionStartedAtMillis,
