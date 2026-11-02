@@ -35,15 +35,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -63,6 +63,7 @@ import com.example.atlas.telemetry.UnsavedData
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AtlasApp(
     viewModel: DashboardViewModel,
@@ -93,7 +94,9 @@ fun AtlasApp(
     LaunchedEffect(page, storage.loaded) {
         if (storage.loaded && (page == "History" || page == "Settings")) telemetry.refresh()
     }
-    val pageListState = key(page) { rememberLazyListState() }
+    // B6: each page keeps its own (saveable) scroll position; returning to Overview no longer resets it.
+    val pageStates = rememberSaveableStateHolder()
+    val topBarScroll = TopAppBarDefaults.enterAlwaysScrollBehavior()
     BackHandler(page != "Dashboard") { page = "Dashboard" }
     val selected = state.radios.firstOrNull { it.type.name == page }
     val bluetoothVisible = selected?.type == RadioType.BLUETOOTH
@@ -131,142 +134,145 @@ fun AtlasApp(
             blePermissionsMissing, wifiPermissionsMissing, cellularPermissionsMissing)
     }
     fun cue(radio: RadioType) = UnsavedCue(unsavedCounts[radio.name] ?: 0, storage.busy, storage.loaded && storage.error == null)
-    Scaffold(topBar = { AtlasTopBar() }, bottomBar = {
+    val pageTitle = selected?.type?.title ?: AtlasSection.entries.firstOrNull { it.page == page }?.label ?: page
+    Scaffold(modifier = Modifier.nestedScroll(topBarScroll.nestedScrollConnection), topBar = {
+        AtlasTopBar(pageTitle, onUp = if (selected != null) ({ page = "Dashboard" }) else null, scrollBehavior = topBarScroll)
+    }, bottomBar = {
         AtlasNavigation(page, historyBadge = unsavedCounts.values.any { it > 0 }) { page = it }
     }) { padding ->
-        LazyColumn(
-            state = pageListState,
-            // B9: edge-to-edge (API 35+) does not resize for the keyboard, so pad the list for the IME beyond the Scaffold insets.
-            modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().testTag("atlas-content"),
-            contentPadding = PaddingValues(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Pairs {
-                    Text(selected?.type?.title ?: if (page == "Dashboard") "Overview" else page, style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.semantics { heading() })
-                    // History, Settings and Project are peer tabs reached from the nav bar; only radio sub-screens need a way back.
-                    if (selected != null) TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
+        pageStates.SaveableStateProvider(page) {
+            val pageListState = rememberLazyListState()
+            LazyColumn(
+                state = pageListState,
+                // B9: edge-to-edge (API 35+) does not resize for the keyboard, so pad the list for the IME beyond the Scaffold insets.
+                modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().testTag("atlas-content"),
+                contentPadding = PaddingValues(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // B6: the page title lives in the top app bar (with an Up arrow on radio screens). The in-list text button stays
+                // as well (plan option b) because the DIT and physical tests find "Back to dashboard" by text in atlas-content.
+                if (selected != null) item(key = "back-to-dashboard") {
+                    TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
                 }
-            }
-            // Active sessions are announced on every page (the "Leaving X stops…" copy is a safety notice). When idle, only
-            // Overview and the radio screens get a one-line note; History, Settings and Project show nothing.
-            val sessionMessage = when {
-                nfcState.reading -> "NFC reader active. Leaving NFC stops reader mode."
-                cell.collecting -> "Cellular collection active. Leaving Cellular stops app collection."
-                wifi.collecting -> "Wi-Fi survey active. Leaving Wi-Fi stops app collection."
-                ble.scanning -> "BLE collection active. Leaving Bluetooth stops collection."
-                gatt.ready -> "Bluetooth connected. Leaving Bluetooth disconnects the device."
-                else -> null
-            }
-            val idleMessage = when {
-                sessionMessage != null -> null
-                page == "Dashboard" -> "All collectors idle. Choose a radio to begin."
-                else -> when (selected?.type) {
-                    RadioType.BLUETOOTH -> "Bluetooth idle. Nothing is collected until you start a BLE scan."
-                    RadioType.WIFI -> "Wi-Fi idle. Nothing is collected until you start a survey."
-                    RadioType.CELLULAR -> "Cellular idle. Nothing is collected until you start collection."
-                    RadioType.NFC -> "NFC idle. Tags are read only after you start the reader."
-                    null -> null
+                // Active sessions are announced on every page (the "Leaving X stops…" copy is a safety notice). When idle, only
+                // Overview and the radio screens get a one-line note; History, Settings and Project show nothing.
+                val sessionMessage = when {
+                    nfcState.reading -> "NFC reader active. Leaving NFC stops reader mode."
+                    cell.collecting -> "Cellular collection active. Leaving Cellular stops app collection."
+                    wifi.collecting -> "Wi-Fi survey active. Leaving Wi-Fi stops app collection."
+                    ble.scanning -> "BLE collection active. Leaving Bluetooth stops collection."
+                    gatt.ready -> "Bluetooth connected. Leaving Bluetooth disconnects the device."
+                    else -> null
                 }
-            }
-            // B1: on a radio screen the same line sits inside that screen's control card, next to Start/Stop.
-            val radioNotice = sessionMessage ?: idleMessage.orEmpty()
-            val radioScreen = selected?.type != null && page != "Project"
-            if (!radioScreen && (sessionMessage != null || idleMessage != null)) item(key = "session-banner") {
-                AtlasSessionBanner(active = sessionMessage != null, message = sessionMessage ?: idleMessage.orEmpty())
-            }
-            if (state.refreshing) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-            state.error?.let { error -> item { DiagnosticNotice("STATE", error) } }
-            when {
-                page == "Project" -> projectContent()
-                selected?.type == RadioType.BLUETOOTH -> bluetoothContent(
-                    selected, bluetooth, ble, gatt, blePermissionsMissing, radioNotice, cue(RadioType.BLUETOOTH), saveAll, onBlePermissions,
-                    { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings
-                )
-                selected?.type == RadioType.WIFI -> wifiContent(
-                    selected, wifiSurvey, wifi, wifiPermissionsMissing, { wifiNowMicros.value }, radioNotice, cue(RadioType.WIFI), saveAll,
-                    onWifiPermissions, onAppSettings
-                )
-                selected?.type == RadioType.CELLULAR -> cellularContent(
-                    selected, cellular, cell, cellularPermissionsMissing, { wifiNowMicros.value / 1000 }, radioNotice, cue(RadioType.CELLULAR), saveAll,
-                    onCellularPermissions, onAppSettings
-                )
-                selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity, radioNotice, cue(RadioType.NFC), saveAll)
-                selected != null -> item {
-                    ItemColumn {
-                        RadioDetails(selected)
-                        if (selected.type == RadioType.BLUETOOTH && selected.permission == PermissionState.REQUIRED) {
-                            Explanation("Nearby devices permission is used here only to read Bluetooth enabled state. Denial leaves state unknown.")
-                            Button(onClick = { onRequestPermission(selected.type) }) { Text("Check Bluetooth state") }
-                        }
-                        OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh state") }
-                        TextButton(onClick = onAppSettings) { Text("App permission settings") }
+                val idleMessage = when {
+                    sessionMessage != null -> null
+                    page == "Dashboard" -> "All collectors idle. Choose a radio to begin."
+                    else -> when (selected?.type) {
+                        RadioType.BLUETOOTH -> "Bluetooth idle. Nothing is collected until you start a BLE scan."
+                        RadioType.WIFI -> "Wi-Fi idle. Nothing is collected until you start a survey."
+                        RadioType.CELLULAR -> "Cellular idle. Nothing is collected until you start collection."
+                        RadioType.NFC -> "NFC idle. Tags are read only after you start the reader."
+                        null -> null
                     }
                 }
-                page == "History" -> telemetryHistory(storage, savedHistory, telemetry, UnsavedData.summary(unsavedCounts), saveAll,
-                    openOverview = { page = "Dashboard" }, openExport = { page = "Settings" })
-                page == "Settings" -> {
-                    storageSettings(storage, telemetry, onExport, onAppSettings)
-                    // B5: About this device, expandable. App permission settings now has its own Permissions section.
-                    item(key = "settings-about") {
-                        var showDetails by rememberSaveable { mutableStateOf(false) }
+                // B1: on a radio screen the same line sits inside that screen's control card, next to Start/Stop.
+                val radioNotice = sessionMessage ?: idleMessage.orEmpty()
+                val radioScreen = selected?.type != null && page != "Project"
+                if (!radioScreen && (sessionMessage != null || idleMessage != null)) item(key = "session-banner") {
+                    AtlasSessionBanner(active = sessionMessage != null, message = sessionMessage ?: idleMessage.orEmpty())
+                }
+                if (state.refreshing) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                state.error?.let { error -> item { DiagnosticNotice("STATE", error) } }
+                when {
+                    page == "Project" -> projectContent()
+                    selected?.type == RadioType.BLUETOOTH -> bluetoothContent(
+                        selected, bluetooth, ble, gatt, blePermissionsMissing, radioNotice, cue(RadioType.BLUETOOTH), saveAll, onBlePermissions,
+                        { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings
+                    )
+                    selected?.type == RadioType.WIFI -> wifiContent(
+                        selected, wifiSurvey, wifi, wifiPermissionsMissing, { wifiNowMicros.value }, radioNotice, cue(RadioType.WIFI), saveAll,
+                        onWifiPermissions, onAppSettings
+                    )
+                    selected?.type == RadioType.CELLULAR -> cellularContent(
+                        selected, cellular, cell, cellularPermissionsMissing, { wifiNowMicros.value / 1000 }, radioNotice, cue(RadioType.CELLULAR), saveAll,
+                        onCellularPermissions, onAppSettings
+                    )
+                    selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity, radioNotice, cue(RadioType.NFC), saveAll)
+                    selected != null -> item {
                         ItemColumn {
-                            TextButton(onClick = { showDetails = !showDetails }) { Text(if (showDetails) "Hide device details" else "About this device") }
-                            if (showDetails) {
-                                Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
-                                Text("Minimum API 31 · Target API 37 · Development preview")
-                                Explanation("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
-                                Explanation("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
-                                Explanation("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
-                                Explanation("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")
-                                Explanation("NFC reader mode uses explicit 60-second foreground sessions. Up to 32 tag reports and 20 APDU exchanges remain in memory; APDU payloads are never saved to telemetry.")
+                            RadioDetails(selected)
+                            if (selected.type == RadioType.BLUETOOTH && selected.permission == PermissionState.REQUIRED) {
+                                Explanation("Nearby devices permission is used here only to read Bluetooth enabled state. Denial leaves state unknown.")
+                                Button(onClick = { onRequestPermission(selected.type) }) { Text("Check Bluetooth state") }
+                            }
+                            OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh state") }
+                            TextButton(onClick = onAppSettings) { Text("App permission settings") }
+                        }
+                    }
+                    page == "History" -> telemetryHistory(storage, savedHistory, telemetry, UnsavedData.summary(unsavedCounts), saveAll,
+                        openOverview = { page = "Dashboard" }, openExport = { page = "Settings" })
+                    page == "Settings" -> {
+                        storageSettings(storage, telemetry, onExport, onAppSettings)
+                        // B5: About this device, expandable. App permission settings now has its own Permissions section.
+                        item(key = "settings-about") {
+                            var showDetails by rememberSaveable { mutableStateOf(false) }
+                            ItemColumn {
+                                TextButton(onClick = { showDetails = !showDetails }) { Text(if (showDetails) "Hide device details" else "About this device") }
+                                if (showDetails) {
+                                    Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
+                                    Text("Minimum API 31 · Target API 37 · Development preview")
+                                    Explanation("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
+                                    Explanation("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
+                                    Explanation("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
+                                    Explanation("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")
+                                    Explanation("NFC reader mode uses explicit 60-second foreground sessions. Up to 32 tag reports and 20 APDU exchanges remain in memory; APDU payloads are never saved to telemetry.")
+                                }
                             }
                         }
                     }
-                }
-                else -> {
-                    // B7: one-line intro; the saved count is a link to History.
-                    item(key = "overview-intro") {
-                        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                            itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            SectionTitle("Choose a radio")
-                            when {
-                                storage.error != null -> Text("Saved history unavailable", style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.error)
-                                !storage.loaded -> Text("Opening saved history…", style = MaterialTheme.typography.labelLarge)
-                                else -> TextButton(onClick = { page = "History" }) { Text(UiText.records(storage.count) + " saved") }
+                    else -> {
+                        // B7: one-line intro; the saved count is a link to History.
+                        item(key = "overview-intro") {
+                            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                                itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                SectionTitle("Choose a radio")
+                                when {
+                                    storage.error != null -> Text("Saved history unavailable", style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.error)
+                                    !storage.loaded -> Text("Opening saved history…", style = MaterialTheme.typography.labelLarge)
+                                    else -> TextButton(onClick = { page = "History" }) { Text(UiText.records(storage.count) + " saved") }
+                                }
                             }
                         }
-                    }
-                    items(state.radios.sortedBy { it.type == RadioType.NFC }, key = { it.type }) { radio ->
-                        val accessReady = when (radio.type) {
-                            RadioType.BLUETOOTH -> blePermissionsMissing.isEmpty()
-                            RadioType.WIFI -> wifiPermissionsMissing.isEmpty()
-                            RadioType.CELLULAR -> cellularPermissionsMissing.isEmpty()
-                            RadioType.NFC -> true
+                        items(state.radios.sortedBy { it.type == RadioType.NFC }, key = { it.type }) { radio ->
+                            val accessReady = when (radio.type) {
+                                RadioType.BLUETOOTH -> blePermissionsMissing.isEmpty()
+                                RadioType.WIFI -> wifiPermissionsMissing.isEmpty()
+                                RadioType.CELLULAR -> cellularPermissionsMissing.isEmpty()
+                                RadioType.NFC -> true
+                            }
+                            val collecting = when (radio.type) {
+                                RadioType.BLUETOOTH -> ble.scanning
+                                RadioType.WIFI -> wifi.collecting
+                                RadioType.CELLULAR -> cell.collecting
+                                RadioType.NFC -> nfcState.reading
+                            }
+                            val lastMeasurement = when (radio.type) {
+                                RadioType.BLUETOOTH -> ble.history.firstOrNull()?.observedAtMillis
+                                RadioType.WIFI -> (wifi.rows.map { it.observedAtMillis } + wifi.connections.map { it.observedAtMillis }).maxOrNull()
+                                RadioType.CELLULAR -> listOfNotNull(cell.cells?.receivedAtMillis, cell.signal?.receivedAtMillis).maxOrNull()
+                                RadioType.NFC -> nfcState.tags.firstOrNull()?.observedAtMillis
+                            }
+                            OverviewCard(
+                                radio = radio,
+                                status = RadioStatus.of(radio.availability, radio.state, accessReady, collecting),
+                                summary = RadioStatus.summaryLine(radio.availability, radio.state, lastMeasurement?.let(::shortTime)),
+                                open = { page = radio.type.name }
+                            )
                         }
-                        val collecting = when (radio.type) {
-                            RadioType.BLUETOOTH -> ble.scanning
-                            RadioType.WIFI -> wifi.collecting
-                            RadioType.CELLULAR -> cell.collecting
-                            RadioType.NFC -> nfcState.reading
+                        item {
+                            OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh capabilities") }
                         }
-                        val lastMeasurement = when (radio.type) {
-                            RadioType.BLUETOOTH -> ble.history.firstOrNull()?.observedAtMillis
-                            RadioType.WIFI -> (wifi.rows.map { it.observedAtMillis } + wifi.connections.map { it.observedAtMillis }).maxOrNull()
-                            RadioType.CELLULAR -> listOfNotNull(cell.cells?.receivedAtMillis, cell.signal?.receivedAtMillis).maxOrNull()
-                            RadioType.NFC -> nfcState.tags.firstOrNull()?.observedAtMillis
-                        }
-                        OverviewCard(
-                            radio = radio,
-                            status = RadioStatus.of(radio.availability, radio.state, accessReady, collecting),
-                            summary = RadioStatus.summaryLine(radio.availability, radio.state, lastMeasurement?.let(::shortTime)),
-                            open = { page = radio.type.name }
-                        )
-                    }
-                    item {
-                        OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh capabilities") }
                     }
                 }
             }
@@ -295,7 +301,6 @@ private fun RadioDetails(radio: RadioCapability) {
     }
 }
 
-/** "Last measurement: 6:51 PM (3 min ago)"; the relative part refreshes every 30 s without recomposing the page. */
 /** Time of day for today, short date and time otherwise. */
 private fun shortTime(epochMillis: Long): String =
     if (DateUtils.isToday(epochMillis)) TimeFormats.time(epochMillis, DateFormat.SHORT)

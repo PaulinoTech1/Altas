@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * The three glyphs Atlas needs, drawn from the Material icon geometry (24 dp grid) so the app does not take on the
+ * The glyphs Atlas needs, drawn from the Material icon geometry (24 dp grid) so the app does not take on the
  * material-icons dependency. Icon() tints them with the current content color.
  */
 object AtlasIcons {
@@ -42,6 +42,15 @@ object AtlasIcons {
             close()
             moveTo(11f, 7f); horizontalLineToRelative(2f); verticalLineToRelative(6f); horizontalLineToRelative(-2f); close()
             moveTo(11f, 15f); horizontalLineToRelative(2f); verticalLineToRelative(2f); horizontalLineToRelative(-2f); close()
+        }
+    }
+
+    /** Up / back arrow (Material "arrow_back"); AtlasTopBar mirrors it in right-to-left layouts. */
+    val ArrowBack: ImageVector by lazy {
+        icon("ArrowBack") {
+            moveTo(20f, 11f); horizontalLineTo(7.83f); lineToRelative(5.59f, -5.59f); lineTo(12f, 4f)
+            lineToRelative(-8f, 8f); lineToRelative(8f, 8f); lineToRelative(1.41f, -1.41f); lineTo(7.83f, 13f)
+            horizontalLineTo(20f); verticalLineToRelative(-2f); close()
         }
     }
 

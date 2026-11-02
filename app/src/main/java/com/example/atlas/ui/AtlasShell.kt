@@ -10,11 +10,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -25,21 +27,32 @@ enum class AtlasSection(val page: String, val label: String) {
     SETTINGS("Settings", "Settings"), PROJECT("Project", "Project")
 }
 
+/**
+ * B6: Material 3 top app bar with the page or radio title (one line, so it does not grow at large font), an Up arrow on
+ * radio screens (contentDescription "Back to dashboard") and the PREVIEW badge as a compact action. It collapses on
+ * scroll (enterAlways) and returns as soon as the user scrolls back up. The brand subtitle moved to Project.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AtlasTopBar() {
-    Surface(tonalElevation = 1.dp) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column {
-                Text("ATLAS RF", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                Text("On-device radio diagnostics", style = MaterialTheme.typography.bodySmall)
+fun AtlasTopBar(title: String, onUp: (() -> Unit)?, scrollBehavior: TopAppBarScrollBehavior) {
+    TopAppBar(
+        title = {
+            Text(title, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.semantics { heading() })
+        },
+        navigationIcon = {
+            if (onUp != null) IconButton(onClick = onUp) { val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+                Icon(AtlasIcons.ArrowBack, contentDescription = "Back to dashboard",
+                    modifier = Modifier.graphicsLayer { scaleX = if (rtl) -1f else 1f }) }
+        },
+        actions = {
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small,
+                modifier = Modifier.padding(end = 12.dp)) {
+                Text("PREVIEW", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             }
-            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small) {
-                Text("PREVIEW", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-            }
-        }
-    }
+        },
+        scrollBehavior = scrollBehavior
+    )
 }
 
 /** Active: a prominent card. Idle: a single quiet line. Both are polite live regions so TalkBack hears start and stop. */
@@ -108,6 +121,9 @@ private fun NavigationGlyph(section: AtlasSection, color: Color) {
 fun LazyListScope.projectContent() {
     item {
         ItemColumn {
+            // B6: the brand line moved here from the old top bar.
+            Text("ATLAS RF", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text("On-device radio diagnostics", style = MaterialTheme.typography.bodySmall)
             SectionTitle("Built to grow")
             Explanation("Atlas uses separate acquisition modules and a shared telemetry format. New modules can be added without replacing your saved history.")
         }
