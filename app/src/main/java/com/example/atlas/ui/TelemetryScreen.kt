@@ -18,7 +18,7 @@ fun LazyListScope.storageStatus(state: TelemetryUiState) {
     item {
         ItemColumn {
             Text("Saved records: ${state.count}", style = MaterialTheme.typography.titleMedium)
-            if (!state.loaded && state.error == null) Text("Opening private telemetry storage…")
+            if (!state.loaded && state.error == null) Explanation("Opening private telemetry storage…")
             state.message?.let { Text(it) }
             state.error?.let { DiagnosticNotice("STORAGE", it) }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -30,7 +30,8 @@ fun LazyListScope.telemetryHistory(state: TelemetryUiState, rows: List<Measureme
     storageStatus(state)
     item {
         SectionCard {
-            Text("Radio histories are temporary until explicitly saved. Saving does not start collection. GATT payloads are not persisted in this phase.")
+            ExpandableNotice("Session measurements are temporary until you save them.",
+                "Radio histories are temporary until explicitly saved. Saving does not start collection. GATT payloads are not persisted in this phase.")
             Button(onClick = onSave, enabled = state.loaded && !state.busy) { Text("Save session measurements") }
             TextButton(onClick = vm::refresh, enabled = state.loaded && !state.busy) { Text("Apply retention now") }
         }
@@ -97,8 +98,9 @@ private fun SettingsControls(state: TelemetryUiState, vm: TelemetryViewModel, on
     var confirmFullExport by rememberSaveable { mutableStateOf(false) }
     ItemColumn {
         SectionCard {
-            Text("Private telemetry storage", style = MaterialTheme.typography.titleLarge)
-            Text("Saved identifiers stay in the app sandbox. Backup is disabled. Exports are copied to your chosen provider and are no longer governed by app retention.")
+            SectionTitle("Private telemetry storage")
+            ExpandableNotice("Saved identifiers stay in the app sandbox; exported copies leave it.",
+                "Saved identifiers stay in the app sandbox. Backup is disabled. Exports are copied to your chosen provider and are no longer governed by app retention.")
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Switch(checked = redact, onCheckedChange = { redact = it }, enabled = !state.busy && state.loaded,
                     modifier = Modifier.testTag("export-redaction"))
@@ -122,9 +124,11 @@ private fun SettingsControls(state: TelemetryUiState, vm: TelemetryViewModel, on
                     dismissButton = { TextButton(onClick = { confirmFullExport = false }) { Text("Cancel") } }
                 )
             }
-            Text("Export includes all saved records after retention, regardless of the History filter. Redaction does not anonymize signal patterns or timestamps.")
+            ExpandableNotice("Exports include every saved record, regardless of the History filter.",
+                "Export includes all saved records after retention, regardless of the History filter. Redaction does not anonymize signal patterns or timestamps.")
         }
         SectionCard {
+            SectionTitle("Retention")
             Text("Retention: ${UiText.days(days)}; maximum ${UiText.count(maximum, "measurement record")}")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(1, 7, 30).forEach { value -> FilterChip(selected = days == value, onClick = { days = value }, label = { Text(UiText.days(value)) }) }
@@ -132,7 +136,8 @@ private fun SettingsControls(state: TelemetryUiState, vm: TelemetryViewModel, on
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(1000, 10000, 50000).forEach { value -> FilterChip(selected = maximum == value, onClick = { maximum = value }, label = { Text(UiText.records(value)) }) }
             }
-            Text("Applying retention permanently removes older/excess saved records. Temporary radio histories remain until cleared or the app process ends.")
+            ExpandableNotice("Applying retention permanently removes older and excess saved records.",
+                "Applying retention permanently removes older/excess saved records. Temporary radio histories remain until cleared or the app process ends.")
             Button(onClick = { vm.configure(StoragePreferences(days, maximum, redact)) }, enabled = state.loaded && !state.busy) { Text("Apply storage preferences") }
         }
     }

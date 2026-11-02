@@ -100,8 +100,8 @@ private fun NavigationGlyph(section: AtlasSection, color: Color) {
 fun LazyListScope.projectContent() {
     item {
         ItemColumn {
-            Text("Built to grow", style = MaterialTheme.typography.titleLarge)
-            Text("Atlas uses separate acquisition modules and a shared telemetry format. New modules can be added without replacing your saved history.")
+            SectionTitle("Built to grow")
+            Explanation("Atlas uses separate acquisition modules and a shared telemetry format. New modules can be added without replacing your saved history.")
         }
     }
     item { ProjectFeature("Available in this preview", "BLE discovery and advertisements; Wi-Fi surveys; reported cellular measurements; foreground NFC reader; local saves, history and JSON export. Hardware results depend on permissions and what Android supplies.") }
@@ -112,7 +112,7 @@ fun LazyListScope.projectContent() {
     item {
         ItemColumn {
             Text("Build ${stringResource(R.string.atlas_version)}", style = MaterialTheme.typography.labelLarge)
-            Text("Development preview. Collections are user initiated and stop when their radio screen or the app is left. Unsaved session histories are temporary.")
+            Explanation("Development preview. Collections are user initiated and stop when their radio screen or the app is left. Unsaved session histories are temporary.")
         }
     }
 }
@@ -122,7 +122,7 @@ private fun ProjectFeature(title: String, detail: String) {
     Surface(Modifier.fillMaxWidth(), tonalElevation = 1.dp, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(detail, style = MaterialTheme.typography.bodyMedium)
+            Explanation(detail)
         }
     }
 }

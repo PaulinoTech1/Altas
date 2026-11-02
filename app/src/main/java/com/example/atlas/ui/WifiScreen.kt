@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.atlas.acquisition.wifi.*
@@ -41,7 +42,9 @@ fun LazyListScope.wifiContent(
                 Text("Capability check: ${radio.state.label}")
                 Text("Survey permission: ${if (missingPermissions.isEmpty()) "Granted" else "Precise location needed"}")
             }
-            Text("Wi-Fi surveying can reveal location. Android requires precise location permission and enabled location services.")
+            ExpandableNotice("Wi-Fi surveying can reveal location.",
+                "Wi-Fi surveying can reveal location. Android requires precise location permission and enabled location services.",
+                showFull = missingPermissions.isNotEmpty())
             OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
             TextButton(onClick = openSettings) { Text("App permission settings") }
             if (missingPermissions.isNotEmpty()) PermissionGuidance()
@@ -59,23 +62,26 @@ fun LazyListScope.wifiContent(
         }
         Text("Android scan throttling: ${when (state.osScanThrottlingEnabled) { true -> "Enabled"; false -> "Disabled"; null -> "Not reported" }}")
         state.error?.let { DiagnosticNotice("WIFI", it) }
-        Text("Sessions stop after 60 seconds. No automatic retries. Requests are spaced by at least 30 seconds and limited to four per two minutes; Android can further restrict scans.", style = MaterialTheme.typography.bodySmall)
-        Text("Stop unregisters Atlas callbacks. Android provides no cancellation API for a hardware scan already requested.", style = MaterialTheme.typography.bodySmall)
+        ExpandableNotice("Sessions stop after 60 seconds; scan requests are rate limited.",
+            "Sessions stop after 60 seconds. No automatic retries. Requests are spaced by at least 30 seconds and limited to four per two minutes; Android can further restrict scans.")
+        ExpandableNotice("Stop ends Atlas collection but cannot cancel a scan Android already started.",
+            "Stop unregisters Atlas callbacks. Android provides no cancellation API for a hardware scan already requested.")
         OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear Wi-Fi history") }
     } }
     item { ItemColumn {
-        Text("Survey summary", style = MaterialTheme.typography.titleLarge)
+        SectionTitle("Survey summary")
         Text("${state.rows.size} displayed AP rows / ${state.totalRows} reported · ${state.history.size}/1024 distinct source samples retained")
         Text("${state.updatedBroadcasts} updated platform broadcasts / ${state.scanBroadcasts} total. Broadcasts are shared across apps; an update is not proof this app caused the scan.")
         state.rows.groupingBy { WifiValues.band(it.frequencyMhz) }.eachCount().toSortedMap().forEach { (band, count) -> Text("$band: $count reported rows") }
-        Text("AP counts by channel (not channel utilization)", style = MaterialTheme.typography.titleSmall)
+        Text("AP counts by channel (not channel utilization)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
         val channels = state.rows.filter { it.channel != null }.groupingBy { "${WifiValues.band(it.frequencyMhz)} / ${it.channel}" }.eachCount()
         Text(channels.toSortedMap().entries.joinToString(" · ") { "${it.key}: ${it.value}" }.ifEmpty { "No valid channels reported" })
     } }
     item { ItemColumn {
-        Text("Reported Wi-Fi connections", style = MaterialTheme.typography.titleLarge)
-        Text("Link rates are reported connection properties, not measured throughput. Connection snapshots are retained after Stop.", style = MaterialTheme.typography.bodySmall)
-        if (state.connections.isEmpty()) Text("No Wi-Fi connection information delivered in this session. No connection, permission redaction, or a pending callback are possible.")
+        SectionTitle("Reported Wi-Fi connections")
+        ExpandableNotice("Link rates are reported by Android, not measured throughput.",
+            "Link rates are reported connection properties, not measured throughput. Connection snapshots are retained after Stop.")
+        if (state.connections.isEmpty()) Explanation("No Wi-Fi connection information delivered in this session. No connection, permission redaction, or a pending callback are possible.")
     } }
     items(state.connections, key = { "connection-${it.key}" }) { connection ->
         Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
@@ -91,9 +97,10 @@ fun LazyListScope.wifiContent(
         }
     }
     item { ItemColumn {
-        Text("Access points", style = MaterialTheme.typography.titleLarge)
-        Text("Source timestamps determine age; rows become stale after 30 seconds. Empty SSIDs may be hidden or redacted. Channel numbers do not establish regional authorization.", style = MaterialTheme.typography.bodySmall)
-        if (state.rows.isEmpty()) Text("No access points reported. Cache may be empty, or a scan may be pending, restricted or unsupported.")
+        SectionTitle("Access points")
+        ExpandableNotice("Rows become stale 30 seconds after their source timestamp.",
+            "Source timestamps determine age; rows become stale after 30 seconds. Empty SSIDs may be hidden or redacted. Channel numbers do not establish regional authorization.")
+        if (state.rows.isEmpty()) Explanation("No access points reported. Cache may be empty, or a scan may be pending, restricted or unsupported.")
     } }
     items(state.rows, key = { "ap-${it.eventId}" }) { row ->
         Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
@@ -108,9 +115,9 @@ fun LazyListScope.wifiContent(
                 if (row.bssid != null) TextButton(onClick = { viewModel.select(row.bssid) }) { Text("Inspect signal history") }
                 if (row.bssid != null && row.bssid == state.selectedBssid) {
                     val samples = state.history.filter { it.bssid == row.bssid }.take(50).asReversed()
-                    Text("Selected AP signal history", style = MaterialTheme.typography.titleMedium)
+                    SectionTitle("Selected AP signal history")
                     SignalHistory(samples)
-                    Text("Chart: latest 50 actual source observations; list: latest 10. Cache rereads add no samples. Gaps are not filled.", style = MaterialTheme.typography.bodySmall)
+                    Explanation("Chart: latest 50 actual source observations; list: latest 10. Cache rereads add no samples. Gaps are not filled.")
                     samples.asReversed().take(10).forEach { sample ->
                         Text("${wifiTime(sample.observedAtMillis)} · ${sample.rssiDbm?.let { "$it dBm" } ?: "RSSI unavailable"} · Source ${sample.sourceElapsedMicros ?: "unavailable"} µs", style = MaterialTheme.typography.bodySmall)
                     }

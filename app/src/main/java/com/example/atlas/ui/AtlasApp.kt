@@ -125,7 +125,7 @@ fun AtlasApp(
         ) {
             item {
                 Pairs {
-                    Text(selected?.type?.title ?: if (page == "Dashboard") "Overview" else page, style = MaterialTheme.typography.headlineLarge,
+                    Text(selected?.type?.title ?: if (page == "Dashboard") "Overview" else page, style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.semantics { heading() })
                     // History, Settings and Project are peer tabs reached from the nav bar; only radio sub-screens need a way back.
                     if (selected != null) TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
@@ -176,7 +176,7 @@ fun AtlasApp(
                     ItemColumn {
                         RadioDetails(selected)
                         if (selected.type == RadioType.BLUETOOTH && selected.permission == PermissionState.REQUIRED) {
-                            Text("Nearby devices permission is used here only to read Bluetooth enabled state. Denial leaves state unknown.")
+                            Explanation("Nearby devices permission is used here only to read Bluetooth enabled state. Denial leaves state unknown.")
                             Button(onClick = { onRequestPermission(selected.type) }) { Text("Check Bluetooth state") }
                         }
                         OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh state") }
@@ -217,11 +217,11 @@ fun AtlasApp(
                             if (showDetails) {
                                 Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
                                 Text("Minimum API 31 · Target API 37 · Development preview")
-                                Text("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
-                                Text("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
-                                Text("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
-                                Text("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")
-                                Text("NFC reader mode uses explicit 60-second foreground sessions. Up to 32 tag reports and 20 APDU exchanges remain in memory; APDU payloads are never saved to telemetry.")
+                                Explanation("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
+                                Explanation("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
+                                Explanation("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
+                                Explanation("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")
+                                Explanation("NFC reader mode uses explicit 60-second foreground sessions. Up to 32 tag reports and 20 APDU exchanges remain in memory; APDU payloads are never saved to telemetry.")
                                 TextButton(onClick = onAppSettings) { Text("App permission settings") }
                             }
                         }
@@ -229,8 +229,8 @@ fun AtlasApp(
                 }
                 else -> {
                     item { Pairs {
-                        Text("Choose a radio", style = MaterialTheme.typography.titleLarge)
-                        Text("Review permissions, start a session, then stop. Open History to save your measurements.", style = MaterialTheme.typography.bodyMedium)
+                        SectionTitle("Choose a radio")
+                        Explanation("Review permissions, start a session, then stop. Open History to save your measurements.")
                         Text(when {
                             storage.error != null -> "Saved history unavailable. Open History for details."
                             !storage.loaded -> "Opening saved history…"

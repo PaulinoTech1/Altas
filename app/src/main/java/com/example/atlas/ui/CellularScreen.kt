@@ -32,7 +32,9 @@ fun LazyListScope.cellularContent(
                 Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
                 Text("Access: ${if (missingPermissions.isEmpty()) "Granted" else "Phone status and precise location required"}")
             }
-            Text("Cell measurements can reveal location. Phone status is used for subscription and radio callbacks. No phone numbers, IMSI, IMEI or ICCID are requested.")
+            ExpandableNotice("Cell measurements can reveal location; no phone numbers or SIM identifiers are requested.",
+                "Cell measurements can reveal location. Phone status is used for subscription and radio callbacks. No phone numbers, IMSI, IMEI or ICCID are requested.",
+                showFull = missingPermissions.isNotEmpty())
             OutlinedButton(onClick = requestPermissions) { Text("Review cellular permissions") }
             TextButton(onClick = openSettings) { Text("App permission settings") }
             if (missingPermissions.isNotEmpty()) PermissionGuidance()
@@ -50,27 +52,29 @@ fun LazyListScope.cellularContent(
                 DiagnosticNotice("CELL", "${it.status.name}: ${it.message}")
             else Text(it.message)
         }
-        Text("60-second sessions; refresh requests at least 30 seconds apart. Android may rate-limit or return cache. Stopping unregisters Atlas callbacks; it cannot cancel a modem request already submitted.", style = MaterialTheme.typography.bodySmall)
+        ExpandableNotice("Sessions stop after 60 seconds; refresh requests are at least 30 seconds apart.",
+            "60-second sessions; refresh requests at least 30 seconds apart. Android may rate-limit or return cache. Stopping unregisters Atlas callbacks; it cannot cancel a modem request already submitted.")
         OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear cellular history") }
     } }
     item { ItemColumn {
-        Text("Subscription context", style = MaterialTheme.typography.titleLarge)
+        SectionTitle("Subscription context")
         Text(state.scopeMessage)
-        if (state.subscriptions.isEmpty()) Text("No active slots loaded. Start with permission to inspect availability.")
+        if (state.subscriptions.isEmpty()) Explanation("No active slots loaded. Start with permission to inspect availability.")
         state.subscriptions.forEach { subscription ->
             FilterChip(selected = state.selectedId == subscription.id, onClick = { viewModel.select(subscription.id) },
                 label = { Text("${if (subscription.slot >= 0) "Slot ${subscription.slot + 1}" else "Slot unavailable"} · local subscription ${subscription.id}") })
         }
-        Text("Selecting a slot stops collection. Start again explicitly. Slot IDs are local context, not subscriber credentials.", style = MaterialTheme.typography.bodySmall)
+        ExpandableNotice("Selecting a slot stops collection.",
+            "Selecting a slot stops collection. Start again explicitly. Slot IDs are local context, not subscriber credentials.")
     } }
     item { ItemColumn {
-        Text("Reported network and registration", style = MaterialTheme.typography.titleLarge)
+        SectionTitle("Reported network and registration")
         state.display?.let {
             Text("Reported base technology: ${it.technology}")
             Text("Carrier display: ${it.carrierHint}")
             Text("Display snapshot: ${cellTime(it.receivedAtMillis)}", style = MaterialTheme.typography.bodySmall)
         } ?: Text("Network technology not delivered yet.")
-        Text("A 5G display indicator does not prove NR metrics or active dual connectivity.", style = MaterialTheme.typography.bodySmall)
+        Explanation("A 5G display indicator does not prove NR metrics or active dual connectivity.")
         state.service?.let { service ->
             Text("Voice service: ${service.voiceState}")
             service.registrations.forEach {
@@ -81,8 +85,9 @@ fun LazyListScope.cellularContent(
         } ?: Text("Service state not delivered yet.")
     } }
     item { ItemColumn {
-        Text("Subscription signal report", style = MaterialTheme.typography.titleLarge)
-        Text("SignalStrength values are not assigned to a specific CellInfo row. LTE and NR are shown separately; missing values stay unavailable.", style = MaterialTheme.typography.bodySmall)
+        SectionTitle("Subscription signal report")
+        ExpandableNotice("Signal values describe the subscription, not a specific cell row.",
+            "SignalStrength values are not assigned to a specific CellInfo row. LTE and NR are shown separately; missing values stay unavailable.")
         state.signal?.let { report ->
             Text("Callback subscription context: ${report.subscriptionContext ?: "unavailable"}")
             Text("Received: ${cellTime(report.receivedAtMillis)} · source age ${CellularValues.age(report.sourceElapsedMillis, nowElapsedMillis)?.let { "${it}ms" } ?: "unavailable"}")
@@ -97,12 +102,13 @@ fun LazyListScope.cellularContent(
     } }
     state.cells?.let { batch ->
         item { ItemColumn {
-            Text("Reported cells", style = MaterialTheme.typography.titleLarge)
+            SectionTitle("Reported cells")
             Text("${batch.rows.size} displayed / ${batch.totalRows} supplied")
             Text(if (batch.delivery == CellDelivery.DEVICE_CACHE) "Device-wide cache: not assigned to a SIM."
                 else "Callback/request context: local subscription ${batch.subscriptionContext ?: "unavailable"}. Per-row SIM ownership is not supplied by CellInfo.")
             Text("Source: ${batch.sourceApi} · received ${cellTime(batch.receivedAtMillis)}", style = MaterialTheme.typography.bodySmall)
-            Text("Unregistered rows are reported neighbors/observed cells, not a complete neighbor survey. Stale after 30 seconds. Other RAT identities are not normalized.", style = MaterialTheme.typography.bodySmall)
+            ExpandableNotice("Unregistered rows are reported neighbors, not a complete neighbor survey.",
+                "Unregistered rows are reported neighbors/observed cells, not a complete neighbor survey. Stale after 30 seconds. Other RAT identities are not normalized.")
             if (batch.rows.isEmpty()) Text("Android returned an empty cell list. No cells or neighbors can be inferred from it.")
         } }
         items(batch.rows.indices.toList(), key = { "cell-${batch.eventId}-$it" }) { index ->
@@ -119,9 +125,9 @@ fun LazyListScope.cellularContent(
                 }
             }
         }
-    } ?: item { Text("No cell list delivered. Signal callbacks may still supply LTE/NR values without cell identities.") }
+    } ?: item { Explanation("No cell list delivered. Signal callbacks may still supply LTE/NR values without cell identities.") }
     item { ItemColumn {
-        Text("In-memory report history", style = MaterialTheme.typography.titleLarge)
+        SectionTitle("In-memory report history")
         Text("${state.history.size}/64 cell reports · ${state.signalHistory.size}/128 signal reports retained. Repeated identical cell rows/context do not add history.")
         state.history.take(8).forEach { report ->
             Text("${cellTime(report.receivedAtMillis)} · ${report.rows.size} rows · ${if (report.delivery == CellDelivery.DEVICE_CACHE) "device-wide cache" else "subscription context ${report.subscriptionContext}"}", style = MaterialTheme.typography.bodySmall)

@@ -52,7 +52,9 @@ fun LazyListScope.bluetoothContent(
             if (radio.permission == PermissionState.REQUIRED) {
                 Button(onClick = requestStatePermission) { Text("Check Bluetooth state") }
             }
-            Text("RF surveying uses Nearby devices and precise location. Granting permission does not start collection.")
+            ExpandableNotice("Scanning needs Nearby devices and precise location.",
+                "RF surveying uses Nearby devices and precise location. Granting permission does not start collection.",
+                showFull = missingPermissions.isNotEmpty())
             OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
             TextButton(onClick = openSettings) { Text("App permission settings") }
             if (missingPermissions.isNotEmpty()) PermissionGuidance()
@@ -60,27 +62,28 @@ fun LazyListScope.bluetoothContent(
     }
     item {
         ItemColumn {
-            Text("BLE collection", style = MaterialTheme.typography.titleLarge)
+            SectionTitle("BLE collection")
             BleControls(state, viewModel, missingPermissions.isEmpty())
             Text(state.status)
             state.error?.let { DiagnosticNotice("BLE", it) }
             Text("${state.devices.size} retained addresses · ${state.receivedCount} received observations · ${state.history.size}/1024 history entries")
-            Text("No automatic restart. 10-second restart cooldown; Android may impose further limits. Addresses can rotate. This is not lossless packet capture.",
-                style = MaterialTheme.typography.bodySmall)
+            ExpandableNotice("Scans never restart automatically; a 10-second cooldown applies between scans.",
+                "No automatic restart. 10-second restart cooldown; Android may impose further limits. Addresses can rotate. This is not lossless packet capture.")
             OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
         }
     }
     item {
         ItemColumn {
-            Text("GATT: ${gatt.status}", style = MaterialTheme.typography.titleLarge)
+            SectionTitle("GATT: ${gatt.status}")
             gatt.address?.let { Text("Selected connection: $it") }
             gatt.error?.let { DiagnosticNotice("GATT", it) }
             if (gatt.address != null) OutlinedButton(onClick = viewModel.gatt::disconnect) { Text("Disconnect GATT") }
-            Text("Connect only to a device you own or are authorized to inspect. No app-driven pairing, writes to characteristic values or automatic reconnection. Protected reads may require Android authorization.")
+            ExpandableNotice("Connect only to a device you own or are authorized to inspect.",
+                "Connect only to a device you own or are authorized to inspect. No app-driven pairing, writes to characteristic values or automatic reconnection. Protected reads may require Android authorization.")
             Pairs {
                 gatt.serviceUuids.forEach { Text("Service: $it", style = MaterialTheme.typography.bodySmall) }
             }
-            if (gatt.truncated) Text("Service/characteristic list capped at 128 services / 512 characteristics.")
+            if (gatt.truncated) Explanation("Service/characteristic list capped at 128 services / 512 characteristics.")
         }
     }
     items(gatt.characteristics, key = { "gatt-${it.key}" }) { characteristic ->
@@ -101,15 +104,15 @@ fun LazyListScope.bluetoothContent(
             }
         }
     }
-    item { Text("Nearby BLE observations", style = MaterialTheme.typography.titleLarge) }
-    if (state.devices.isEmpty()) item { Text("No BLE devices observed. Start a bounded scan; an empty scan is a valid outcome.") }
+    item { SectionTitle("Nearby BLE observations") }
+    if (state.devices.isEmpty()) item { Explanation("No BLE devices observed. Start a bounded scan; an empty scan is a valid outcome.") }
     items(state.devices, key = { "device-${it.latest.address}" }) { device ->
         DeviceRow(device, state.selectedAddress == device.latest.address,
             { viewModel.select(if (state.selectedAddress == device.latest.address) null else device.latest.address) },
             { viewModel.connect(device.latest.address) })
     }
     if (state.selectedAddress != null) {
-        item { Text("Selected address history (latest 50)", style = MaterialTheme.typography.titleMedium) }
+        item { SectionTitle("Selected address history (latest 50)") }
         items(state.history.filter { it.address == state.selectedAddress }.take(50), key = { "event-${it.eventId}" }) {
             Text("${time(it.observedAtMillis)} · ${it.rssiDbm?.let { rssi -> "$rssi dBm" } ?: "RSSI unavailable"} · source ${it.sourceElapsedNanos ?: "unavailable"} ns",
                 style = MaterialTheme.typography.bodySmall)
