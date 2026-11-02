@@ -24,9 +24,19 @@ This is a **nearby signal search**, not Apple's Find My network or Precision Fin
 
 Flipper hints have three useful combinations: advertised name resembling `Flipper`, the firmware BLE serial service UUID, and both together with repeated observations. The last combination is labeled **Heightened Flipper Zero possibility**. It is a qualitative label, not a calibrated probability or proof. Generic HID UUIDs and names such as `Control` are intentionally excluded because they are shared by many devices. The app makes no automatic GATT connection.
 
+## Pixel GPS origin and signature isolation (proposed branch)
+
+During an explicit BLE scan, Atlas can request foreground fixes from Android's GPS provider. A BLE observation receives the **Pixel's** latitude, longitude, and reported horizontal accuracy only when a prior GNSS fix is at most ten seconds old on the same monotonic clock. If GPS is unavailable, disabled, denied, or too slow for the bounded scan, the observation has no position. These coordinates are not the advertiser's coordinates. The app does not infer a 3D transmitter location from GPS, phone orientation, or RSSI.
+
+Selecting an address and pressing **Isolate selected signature** hides other addresses from the radar, 3D plot, and device list. Collection and the bounded in-memory history continue for all addresses so the user can restore context. Isolation is by the observed BLE address, not a verified physical identity; a rotating or spoofed address can break continuity. The selected-address history and focused RSSI locator already use that address.
+
+Generic BLE advertisements do not establish a two-way ranging session. Android's Ranging module requires supported local and peer capabilities plus a participating peer and out-of-band negotiation. Atlas will not label a passive RSSI response as validated distance or location. A future cooperative-ranging feature must display the ranging technology, measured distance/angle availability, uncertainty, peer identity basis, and failure state separately from scan-only observations.
+
+This branch's GNSS and isolation changes have not yet been built or exercised on the Pixel. The verification results below apply to the prior main-branch implementation.
+
 ## Resource and privacy boundaries
 
-The game rotation listener is registered only during an explicit bounded BLE scan and unregistered when the flow closes, including stop, timeout, and failure. An orientation is attached only when its monotonic timestamp is within 250 ms of the BLE source timestamp. The existing 1,024-event BLE history cap applies. Orientation samples are currently in memory only; they are not written to Room or JSON export. No new permission, background service, network access, or external dependency was added.
+The game rotation listener and the optional GPS listener are registered only during an explicit bounded BLE scan and unregistered when the flow closes, including stop, timeout, and failure. An orientation is attached only when its monotonic timestamp is within 250 ms of the BLE source timestamp. The existing 1,024-event BLE history cap applies. Orientation and matched GPS fixes are currently in memory only; they are not written to Room or JSON export. No new permission, background service, network access, or external dependency was added.
 
 ## Verification on the connected Pixel
 
