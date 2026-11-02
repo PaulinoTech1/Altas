@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.example.atlas.acquisition.bluetooth.*
 import com.example.atlas.model.RadioCapability
 import com.example.atlas.model.PermissionState
+import java.util.Locale
 
 fun LazyListScope.bluetoothContent(
     radio: RadioCapability,
@@ -50,6 +51,9 @@ fun LazyListScope.bluetoothContent(
     replay: ReplayState? = null
 ) {
     val permissionsGranted = missingPermissions.isEmpty()
+    val isolatedAddress = state.selectedAddress.takeIf { state.isolateSelected }
+    val visibleDevices = if (isolatedAddress == null) state.devices
+        else state.devices.filter { it.latest.address == isolatedAddress }
     // B1: control first (fixes "Start BLE scan" sitting below the first screen), then access, results, caveats.
     radioControlItem(state.scanning) {
         RadioControlCard(
@@ -100,6 +104,17 @@ fun LazyListScope.bluetoothContent(
             OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
         }
     }
+    if (replay == null && state.selectedAddress != null) item(key = "ble-isolation") {
+        ItemColumn {
+            SectionTitle("Selected BLE signature")
+            Text("Observed address: ${state.selectedAddress}. Addresses can rotate or be spoofed.")
+            OutlinedButton(onClick = { viewModel.setIsolation(!state.isolateSelected) }) {
+                Text(if (state.isolateSelected) "Show all signatures" else "Isolate selected signature")
+            }
+            if (state.isolateSelected) Text("Other addresses are hidden from the radar, 3D view and device list. Collection continues normally.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+    }
     item {
         ItemColumn {
             SectionTitle("GATT: ${gatt.status}")
@@ -138,12 +153,13 @@ fun LazyListScope.bluetoothContent(
             // V5: saved data only, no sweep (nothing is scanning); the device list below stays live.
             ReplayChart(replay, "Bluetooth radar", { it.hasBle }) { frame -> BleRadar(frame.ble, false, null, {}, replay = true) }
         } else {
-            val dots = remember(state.devices) { RadarMath.dots(state.devices) }
+            val dots = remember(visibleDevices) { RadarMath.dots(visibleDevices) }
             BleRadar(dots, state.scanning, state.selectedAddress, onSelect = { viewModel.select(it.address) })
         }
     }
     item(key = "ble-orientation-globe") {
-        BleOrientationGlobe(state.history, state.scanning, state.selectedAddress, state.sessionStartedAtMillis, viewModel::select)
+        BleOrientationGlobe(state.history, state.scanning, state.selectedAddress, state.sessionStartedAtMillis,
+            isolateSelected = state.isolateSelected, onSelectAddress = viewModel::select)
     }
     item(key = "ble-signal-locator") {
         BleSignalLocator(state.history, state.selectedAddress, state.scanning, state.sessionStartedAtMillis,
@@ -154,8 +170,9 @@ fun LazyListScope.bluetoothContent(
     }
     item { SectionTitle("Nearby BLE observations") }
     if (state.devices.isEmpty()) item { Explanation("No BLE devices observed. Start a bounded scan; an empty scan is a valid outcome.") }
+    else if (visibleDevices.isEmpty()) item { Explanation("Selected address is no longer in retained device history. Show all signatures or select a new address.") }
     val sparklines = RadarMath.sparklines(state.history)
-    items(state.devices, key = { "device-${it.latest.address}" }) { device ->
+    items(visibleDevices, key = { "device-${it.latest.address}" }) { device ->
         DeviceRow(device, sparklines[device.latest.address].orEmpty(), state.selectedAddress == device.latest.address,
             { viewModel.select(if (state.selectedAddress == device.latest.address) null else device.latest.address) },
             { viewModel.connect(device.latest.address) }, { viewModel.select(device.latest.address) })
@@ -223,6 +240,10 @@ private fun DeviceRow(device: BleDeviceHistory, spark: List<Int>, expanded: Bool
             if (expanded) {
                 Text("Source elapsed time: ${event.sourceElapsedNanos ?: "unavailable"} ns")
                 Text("Age at arrival: ${event.ageMillis(event.receivedElapsedNanos)?.let { "${it}ms" } ?: "unavailable"}. Retained snapshot; not a live current signal.")
+                val fix = event.phoneGpsFix
+                Text(if (fix == null) "Pixel GPS origin: no fresh GNSS fix for this observation."
+                    else String.format(Locale.ROOT, "Pixel GPS origin: %.6f, %.6f ±%.0f m (horizontal)",
+                        fix.latitude, fix.longitude, fix.horizontalAccuracyMeters))
                 Text("Connectable: ${event.connectable}")
                 Text("Advertised services: ${event.advertisement.serviceUuids.joinToString().ifEmpty { "None reported" }}")
                 event.advertisement.manufacturerData.forEach { Text("Manufacturer 0x${it.companyId.toString(16).padStart(4, '0')}: ${it.payloadHex}") }
