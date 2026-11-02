@@ -32,14 +32,17 @@ class TelemetryRepository internal constructor(context: Context) {
         }
     }
 
-    private suspend fun prune(value: StoragePreferences) {
+    /** Applies retention inside the caller's transaction and returns how many saved records it removed. */
+    private suspend fun prune(value: StoragePreferences): Int {
+        val before = dao.totalCount()
         dao.expire(System.currentTimeMillis() - value.retentionDays * 86_400_000L)
         dao.cap(value.maximumRows)
+        return before - dao.totalCount()
     }
 
-    suspend fun maintain() = mutex.withLock { database.withTransaction { prune(preferences.values.first()) } }
+    suspend fun maintain(): Int = mutex.withLock { database.withTransaction { prune(preferences.values.first()) } }
 
-    suspend fun configure(value: StoragePreferences) = mutex.withLock {
+    suspend fun configure(value: StoragePreferences): Int = mutex.withLock {
         preferences.set(value)
         database.withTransaction { prune(value) }
     }

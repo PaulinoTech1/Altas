@@ -42,15 +42,17 @@ fun LazyListScope.telemetryHistory(state: TelemetryUiState, rows: List<Measureme
     items(rows, key = { it.eventId }) { row ->
         Surface(tonalElevation = 1.dp, shape = MaterialTheme.shapes.medium) {
             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("${row.radioType} · ${row.measurementType}", style = MaterialTheme.typography.titleMedium)
-                Text(row.value?.let { "$it ${row.units.orEmpty()}" } ?: "Unavailable (${row.collectionStatus})")
+                Text("${UiText.radioTitle(row.radioType)} · ${row.measurementType}", style = MaterialTheme.typography.titleMedium)
+                Text(row.value?.let { "$it ${row.units.orEmpty()}" }
+                    ?: if (row.collectionStatus == "UNAVAILABLE") "Unavailable" else "Unavailable (${UiText.collectionStatus(row.collectionStatus).lowercase()})")
                 Text(DateFormat.getDateTimeInstance().format(Date(row.eventTimestampMillis)))
-                Text("${row.collectionStatus} · ${row.freshness} at receipt · ${row.permissionState}")
+                Text(UiText.recordSummary(row.collectionStatus, row.freshness, row.permissionState))
                 Text("Source: ${row.sourceApi}", style = MaterialTheme.typography.bodySmall)
                 var expanded by rememberSaveable(row.eventId) { mutableStateOf(false) }
                 TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide record details" else "Inspect record") }
                 if (expanded) {
                     Text("Event: ${row.eventId}")
+                    Text("Radio: ${row.radioType} · status ${row.collectionStatus} · freshness at receipt ${row.freshness} · permission ${row.permissionState}")
                     Text("Interface: ${row.interfaceId ?: "Unavailable"}")
                     Text("Source timestamp: ${row.sourceTimestampMillis ?: "Unavailable"} (${row.sourceTimeBasis})")
                     Text("Received elapsed: ${row.receivedElapsedMillis ?: "Unavailable"} ms · clock scope ${row.bootId ?: "Unavailable"}")
@@ -112,12 +114,12 @@ private fun SettingsControls(state: TelemetryUiState, vm: TelemetryViewModel, on
     }
     Text("Export includes all saved records after retention, regardless of the History filter. Redaction does not anonymize signal patterns or timestamps.")
     HorizontalDivider(Modifier.padding(vertical = 12.dp))
-    Text("Retention: $days days; maximum $maximum measurement records")
+    Text("Retention: ${UiText.days(days)}; maximum ${UiText.count(maximum, "measurement record")}")
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(1, 7, 30).forEach { value -> FilterChip(selected = days == value, onClick = { days = value }, label = { Text("$value days") }) }
+        listOf(1, 7, 30).forEach { value -> FilterChip(selected = days == value, onClick = { days = value }, label = { Text(UiText.days(value)) }) }
     }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(1000, 10000, 50000).forEach { value -> FilterChip(selected = maximum == value, onClick = { maximum = value }, label = { Text("$value records") }) }
+        listOf(1000, 10000, 50000).forEach { value -> FilterChip(selected = maximum == value, onClick = { maximum = value }, label = { Text(UiText.records(value)) }) }
     }
     Text("Applying retention permanently removes older/excess saved records. Temporary radio histories remain until cleared or the app process ends.")
     Button(onClick = { vm.configure(StoragePreferences(days, maximum, redact)) }, enabled = state.loaded && !state.busy) { Text("Apply storage preferences") }

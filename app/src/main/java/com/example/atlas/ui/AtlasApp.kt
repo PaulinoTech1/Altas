@@ -2,6 +2,7 @@ package com.example.atlas.ui
 
 import android.os.Build
 import android.os.SystemClock
+import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -241,7 +242,10 @@ fun AtlasApp(
                                     else -> "Permission needed"
                                 }, style = MaterialTheme.typography.labelLarge,
                                     color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                                Text("Hardware: ${radio.availability.label} · ${radio.state.label}", style = MaterialTheme.typography.bodySmall)
+                                // NOT_QUERIED is expected on the Overview (e.g. Cellular reads state only on its own screen).
+                                val stateLabel = if (radio.state == RadioState.NOT_QUERIED)
+                                    "${radio.type.title} state is read when you open ${radio.type.title}" else radio.state.label
+                                Text("Hardware: ${radio.availability.label} · $stateLabel", style = MaterialTheme.typography.bodySmall)
                                 val permissionLabel = when (radio.type) {
                                     RadioType.BLUETOOTH -> if (blePermissionsMissing.isEmpty()) "Survey access granted" else "Survey permissions needed"
                                     RadioType.WIFI -> if (wifiPermissionsMissing.isEmpty()) "Survey access granted" else "Precise location needed"
@@ -264,7 +268,7 @@ fun AtlasApp(
                                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
                                 Text("Collection: $collectionLabel", style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary)
-                                Text("Session result: ${timeLabel(lastMeasurement)}", style = MaterialTheme.typography.bodySmall)
+                                LastMeasurementLine(lastMeasurement)
                                 radio.error?.let { DiagnosticNotice("STATE", it) }
                             }
                         }
@@ -297,6 +301,25 @@ private fun RadioDetails(radio: RadioCapability) {
             RadioType.NFC -> "Foreground tag reading and explicit APDU commands require compatible authorized tags. Secure-element credential extraction is unsupported."
         })
     }
+}
+
+/** "Last measurement: 6:51 PM (3 min ago)"; the relative part refreshes every 30 s without recomposing the page. */
+@Composable
+private fun LastMeasurementLine(epochMillis: Long?) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val now by produceState(System.currentTimeMillis(), epochMillis, lifecycleOwner) {
+        if (epochMillis != null) lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                value = System.currentTimeMillis()
+                delay(30_000) // Label refresh only; never polls hardware.
+            }
+        }
+    }
+    val formatted = epochMillis?.let {
+        val sameDay = DateUtils.isToday(it)
+        (if (sameDay) DateFormat.getTimeInstance(DateFormat.SHORT) else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)).format(Date(it))
+    }
+    Text(UiText.lastMeasurement(epochMillis, now, formatted), style = MaterialTheme.typography.bodySmall)
 }
 
 private fun timeLabel(epochMillis: Long?): String = epochMillis?.let {

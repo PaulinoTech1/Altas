@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.atlas.ui.UiText
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -42,15 +43,14 @@ class TelemetryViewModel(private val repository: TelemetryRepository) : ViewMode
         "Save finished: $count new records processed. Retention limits applied; repeated observations are ignored."
     }
     fun configure(value: StoragePreferences) = operation("Storage preferences update failed") {
-        repository.configure(value)
-        "Storage preferences saved; retention applied."
+        "Storage preferences saved. ${UiText.retentionResult(repository.configure(value))}."
     }
     fun export(uri: Uri?, redact: Boolean) {
         if (uri == null) { mutable.update { it.copy(message = "Export cancelled; no document written.") }; return }
         operation("Export failed before writing; the chosen document was not written") { "Exported ${repository.export(uri, redact)} records (${if (redact) "identifiers redacted" else "includes identifiers"})." }
     }
     fun exportUnavailable() { mutable.update { it.copy(error = "No document picker is available. Export was not started.") } }
-    fun refresh() = operation("Retention check failed") { repository.maintain(); "Retention checked." }
+    fun refresh() = operation("Retention check failed") { "${UiText.retentionResult(repository.maintain())}." }
     private fun operation(failurePrefix: String, action: suspend () -> String) {
         if (mutable.value.busy || !mutable.value.loaded) return
         mutable.update { it.copy(busy = true, error = null, message = null) }
