@@ -84,7 +84,7 @@ fun BleOrientationGlobe(
         Canvas(Modifier.fillMaxWidth().aspectRatio(1f)
             .testTag("ble-orientation-globe")
             .semantics {
-                contentDescription = "3D phone orientation signature, ${visibleSamples.size} visible paired BLE samples. " +
+                contentDescription = "Pixel origin at center; 3D phone orientation signature, ${visibleSamples.size} visible paired BLE samples. " +
                     "Phone X, Y, Z axes have shared signal-strength ticks at -50, -70, -90, and -100 dBm. " +
                     "Not physical distance. Drag to orbit, pinch to zoom, tap a point to inspect."
                 stateDescription = "View yaw ${(yaw * 180f / PI.toFloat()).roundToInt()} degrees, " +
@@ -139,6 +139,8 @@ fun BleOrientationGlobe(
                 drawText(end, topLeft = Offset((positive.x + 4f).coerceIn(0f, (size.width - end.size.width).coerceAtLeast(0f)),
                     labelY.coerceIn(0f, (size.height - end.size.height).coerceAtLeast(0f))))
             }
+            drawCircle(colors.primary, 6f, center)
+            drawCircle(colors.onSurface, 9f, center, style = Stroke(2f))
             for (point in projected.sortedBy { it.depth }) {
                 val event = point.event
                 val position = Offset(center.x + point.x * radius, center.y + point.y * radius)
@@ -176,7 +178,7 @@ fun BleOrientationGlobe(
                 style = MaterialTheme.typography.bodyMedium)
             val fix = chosen.phoneGpsFix
             Text(if (fix == null) "Pixel GPS fix unavailable for this observation."
-                else String.format(Locale.ROOT, "Pixel GPS %.6f, %.6f ±%.0f m (horizontal)",
+                else String.format(Locale.ROOT, "Pixel GPS %.5f, %.5f ±%.0f m (horizontal)",
                     fix.latitude, fix.longitude, fix.horizontalAccuracyMeters),
                 style = MaterialTheme.typography.bodySmall)
         } else {
