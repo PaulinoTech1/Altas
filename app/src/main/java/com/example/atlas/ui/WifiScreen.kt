@@ -24,15 +24,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.atlas.acquisition.wifi.*
 import com.example.atlas.model.RadioCapability
-import java.text.DateFormat
-import java.util.Date
 
 fun LazyListScope.wifiContent(
     radio: RadioCapability,
     viewModel: WifiViewModel,
     state: WifiUiState,
     missingPermissions: List<String>,
-    nowElapsedMicros: Long,
+    nowElapsedMicros: () -> Long,
     sessionNotice: String,
     unsaved: UnsavedCue,
     onSave: () -> Unit,
@@ -123,7 +121,10 @@ fun LazyListScope.wifiContent(
             "Source timestamps determine age; rows become stale after 30 seconds. Empty SSIDs may be hidden or redacted. Channel numbers do not establish regional authorization.")
         if (state.rows.isEmpty()) Explanation("No access points reported. Cache may be empty, or a scan may be pending, restricted or unsupported.")
     } }
-    items(state.rows, key = { "ap-${it.eventId}" }) { row ->
+    // B8: keyed by BSSID so a rescan updates rows in place (eventId changes every scan); StableKeys never duplicates.
+    val apKeys = StableKeys.of(state.rows, { row -> row.bssid?.let { "ap-$it" } }, { row -> "ap-${row.eventId}" })
+    items(state.rows.size, key = { apKeys[it] }) { index ->
+        val row = state.rows[index]
         Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(row.ssid ?: "SSID hidden / unavailable", style = MaterialTheme.typography.titleMedium)
@@ -131,7 +132,7 @@ fun LazyListScope.wifiContent(
                 Text("RSSI: ${row.rssiDbm?.let { "$it dBm" } ?: "Unavailable"} · ${row.frequencyMhz?.let { "$it MHz" } ?: "Frequency unavailable"}")
                 Text("${WifiValues.band(row.frequencyMhz)} · Channel ${row.channel ?: "unavailable"} · Width ${row.channelWidth}")
                 Text("Advertised security: ${row.capabilities?.takeIf { it.isNotBlank() } ?: "Not supplied"}")
-                Text("${row.freshness(nowElapsedMicros).label} · Age ${row.ageMillis(nowElapsedMicros)?.let { "${it}ms" } ?: "unavailable"}")
+                Text("${row.freshness(nowElapsedMicros()).label} · Age ${row.ageMillis(nowElapsedMicros())?.let { "${it}ms" } ?: "unavailable"}")
                 Text("Delivered: ${wifiTime(row.observedAtMillis)} · ${row.delivery}", style = MaterialTheme.typography.bodySmall)
                 if (row.bssid != null) TextButton(onClick = { viewModel.select(row.bssid) }) { Text("Inspect signal history") }
                 if (row.bssid != null && row.bssid == state.selectedBssid) {
@@ -180,4 +181,4 @@ private fun SignalHistory(rows: List<WifiObservation>) {
     Text("Time → (source timestamps)", style = MaterialTheme.typography.bodySmall)
 }
 
-private fun wifiTime(millis: Long) = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(millis))
+private fun wifiTime(millis: Long) = TimeFormats.dateTime(millis)

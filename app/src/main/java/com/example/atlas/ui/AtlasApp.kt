@@ -60,7 +60,6 @@ import com.example.atlas.telemetry.TelemetryViewModel
 import com.example.atlas.telemetry.UnsavedData
 import kotlinx.coroutines.delay
 import java.text.DateFormat
-import java.util.Date
 
 @Composable
 fun AtlasApp(
@@ -114,7 +113,8 @@ fun AtlasApp(
     val freshnessVisible = wifiVisible || cellularVisible
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = androidx.compose.ui.platform.LocalContext.current as android.app.Activity
-    val wifiNowMicros by produceState(SystemClock.elapsedRealtimeNanos() / 1000, freshnessVisible, lifecycleOwner) {
+    // B8: kept as a State and read through lambdas inside the rows, so the 1 s tick no longer recomposes AtlasApp.
+    val wifiNowMicros = produceState(SystemClock.elapsedRealtimeNanos() / 1000, freshnessVisible, lifecycleOwner) {
         if (freshnessVisible) lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 value = SystemClock.elapsedRealtimeNanos() / 1000
@@ -182,11 +182,11 @@ fun AtlasApp(
                     { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings
                 )
                 selected?.type == RadioType.WIFI -> wifiContent(
-                    selected, wifiSurvey, wifi, wifiPermissionsMissing, wifiNowMicros, radioNotice, cue(RadioType.WIFI), saveAll,
+                    selected, wifiSurvey, wifi, wifiPermissionsMissing, { wifiNowMicros.value }, radioNotice, cue(RadioType.WIFI), saveAll,
                     onWifiPermissions, onAppSettings
                 )
                 selected?.type == RadioType.CELLULAR -> cellularContent(
-                    selected, cellular, cell, cellularPermissionsMissing, wifiNowMicros / 1000, radioNotice, cue(RadioType.CELLULAR), saveAll,
+                    selected, cellular, cell, cellularPermissionsMissing, { wifiNowMicros.value / 1000 }, radioNotice, cue(RadioType.CELLULAR), saveAll,
                     onCellularPermissions, onAppSettings
                 )
                 selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity, radioNotice, cue(RadioType.NFC), saveAll)
@@ -295,8 +295,8 @@ private fun RadioDetails(radio: RadioCapability) {
 /** "Last measurement: 6:51 PM (3 min ago)"; the relative part refreshes every 30 s without recomposing the page. */
 /** Time of day for today, short date and time otherwise. */
 private fun shortTime(epochMillis: Long): String =
-    (if (DateUtils.isToday(epochMillis)) DateFormat.getTimeInstance(DateFormat.SHORT)
-    else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)).format(Date(epochMillis))
+    if (DateUtils.isToday(epochMillis)) TimeFormats.time(epochMillis, DateFormat.SHORT)
+    else TimeFormats.dateTime(epochMillis, DateFormat.SHORT, DateFormat.SHORT)
 
 /**
  * B7: compact Overview card. The whole card opens the radio (click label "Open X"); "Open X" also stays a visible,
@@ -346,5 +346,5 @@ private fun StatusChip(status: RadioStatus) {
 }
 
 private fun timeLabel(epochMillis: Long?): String = epochMillis?.let {
-    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(it))
+    TimeFormats.dateTime(it)
 } ?: "None"

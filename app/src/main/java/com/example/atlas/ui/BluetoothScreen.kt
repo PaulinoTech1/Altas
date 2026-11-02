@@ -26,8 +26,6 @@ import androidx.compose.ui.unit.dp
 import com.example.atlas.acquisition.bluetooth.*
 import com.example.atlas.model.RadioCapability
 import com.example.atlas.model.PermissionState
-import java.text.DateFormat
-import java.util.Date
 
 fun LazyListScope.bluetoothContent(
     radio: RadioCapability,
@@ -203,4 +201,4 @@ private fun DeviceRow(device: BleDeviceHistory, expanded: Boolean, select: () ->
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } })
 }
 
-private fun time(millis: Long): String = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(millis))
+private fun time(millis: Long): String = TimeFormats.dateTime(millis)

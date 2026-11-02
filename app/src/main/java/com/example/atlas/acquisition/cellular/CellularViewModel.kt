@@ -1,5 +1,6 @@
 package com.example.atlas.acquisition.cellular
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
+@Immutable // B8: replaced wholesale on every update; never mutated in place.
 data class CellularUiState(
     val collecting: Boolean = false, val status: String = "Idle — no cellular collection started",
     val subscriptions: List<CellularSubscription> = emptyList(), val selectedId: Int? = null,

@@ -20,7 +20,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.atlas.telemetry.*
 import java.text.DateFormat
 import java.time.ZoneId
-import java.util.Date
 
 fun LazyListScope.storageStatus(state: TelemetryUiState) {
     item(key = "storage-status") {
@@ -83,7 +82,7 @@ fun LazyListScope.telemetryHistory(
         stickyHeader(key = "day-${group.epochDay}-$index", contentType = "day-header") { _: Int ->
             // Opaque so rows scrolling beneath never show through.
             Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface) {
-                Text(HistoryGrouping.dayLabel(group.epochDay, today, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(group.items.first().eventTimestampMillis))),
+                Text(HistoryGrouping.dayLabel(group.epochDay, today, TimeFormats.date(group.items.first().eventTimestampMillis)),
                     Modifier.padding(vertical = 4.dp).semantics { heading() }, style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary)
             }
@@ -116,12 +115,12 @@ private fun HistoryRow(row: Measurement) {
             val value = row.value?.let { "$it ${row.units.orEmpty()}".trim() }
                 ?: if (row.collectionStatus == "UNAVAILABLE") "Unavailable" else "Unavailable (${UiText.collectionStatus(row.collectionStatus).lowercase()})"
             Text("${UiText.radioTitle(row.radioType)} · ${row.measurementType} — $value", style = MaterialTheme.typography.titleSmall)
-            Text("${DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(row.eventTimestampMillis))} · ${UiText.collectionStatus(row.collectionStatus)}",
+            Text("${TimeFormats.time(row.eventTimestampMillis)} · ${UiText.collectionStatus(row.collectionStatus)}",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (expanded) {
                 Spacer(Modifier.height(4.dp))
                 Text(UiText.recordSummary(row.collectionStatus, row.freshness, row.permissionState))
-                Text(DateFormat.getDateTimeInstance().format(Date(row.eventTimestampMillis)))
+                Text(TimeFormats.dateTime(row.eventTimestampMillis, DateFormat.MEDIUM, DateFormat.MEDIUM))
                 Text("Source: ${row.sourceApi}", style = MaterialTheme.typography.bodySmall)
                 Text("Event: ${row.eventId}")
                 Text("Radio: ${row.radioType} · status ${row.collectionStatus} · freshness at receipt ${row.freshness} · permission ${row.permissionState}")

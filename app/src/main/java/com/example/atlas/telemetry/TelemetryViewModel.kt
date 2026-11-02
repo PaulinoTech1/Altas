@@ -1,5 +1,6 @@
 package com.example.atlas.telemetry
 
+import androidx.compose.runtime.Immutable
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -8,6 +9,7 @@ import com.example.atlas.ui.UiText
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
+@Immutable // B8: replaced wholesale on every update; never mutated in place.
 data class TelemetryUiState(
     val preferences: StoragePreferences = StoragePreferences(), val loaded: Boolean = false,
     val count: Int = 0, val busy: Boolean = false, val message: String? = null, val error: String? = null,

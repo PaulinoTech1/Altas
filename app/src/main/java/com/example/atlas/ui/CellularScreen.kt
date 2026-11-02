@@ -19,12 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.atlas.acquisition.cellular.*
 import com.example.atlas.model.RadioCapability
-import java.text.DateFormat
-import java.util.Date
 
 fun LazyListScope.cellularContent(
     radio: RadioCapability, viewModel: CellularViewModel, state: CellularUiState,
-    missingPermissions: List<String>, nowElapsedMillis: Long, sessionNotice: String,
+    missingPermissions: List<String>, nowElapsedMillis: () -> Long, sessionNotice: String,
     unsaved: UnsavedCue, onSave: () -> Unit,
     requestPermissions: () -> Unit, openSettings: () -> Unit
 ) {
@@ -106,7 +104,7 @@ fun LazyListScope.cellularContent(
             "SignalStrength values are not assigned to a specific CellInfo row. LTE and NR are shown separately; missing values stay unavailable.")
         state.signal?.let { report ->
             Text("Callback subscription context: ${report.subscriptionContext ?: "unavailable"}")
-            Text("Received: ${cellTime(report.receivedAtMillis)} · source age ${CellularValues.age(report.sourceElapsedMillis, nowElapsedMillis)?.let { "${it}ms" } ?: "unavailable"}")
+            Text("Received: ${cellTime(report.receivedAtMillis)} · source age ${CellularValues.age(report.sourceElapsedMillis, nowElapsedMillis())?.let { "${it}ms" } ?: "unavailable"}")
             if (report.signals.isEmpty()) Text("No signal strengths reported.")
             report.signals.forEach { signal ->
                 Text(signal.rat, style = MaterialTheme.typography.titleMedium)
@@ -136,7 +134,7 @@ fun LazyListScope.cellularContent(
                     Text("Area code: ${row.areaCode ?: "Unavailable"} · Radio channel: ${row.channel ?: "Unavailable"}")
                     Text("MCC: ${row.mcc ?: "Unavailable"} · MNC: ${row.mnc ?: "Unavailable"}")
                     Metrics(row.metrics)
-                    Text("${batch.freshness(row, nowElapsedMillis)} · source age ${CellularValues.age(row.sourceElapsedMillis, nowElapsedMillis)?.let { "${it}ms" } ?: "unavailable"}")
+                    Text("${batch.freshness(row, nowElapsedMillis())} · source age ${CellularValues.age(row.sourceElapsedMillis, nowElapsedMillis())?.let { "${it}ms" } ?: "unavailable"}")
                     Text("Source elapsed time: ${row.sourceElapsedMillis ?: "unavailable"} ms", style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -166,4 +164,4 @@ private const val CELL_RATIONALE = "Cell measurements can reveal location. Phone
 private fun Metrics(metrics: List<CellularMetric>) {
     metrics.forEach { Text("${it.name}: ${it.value?.let { value -> "$value ${it.unit}" } ?: "Unavailable"}") }
 }
-private fun cellTime(millis: Long) = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(millis))
+private fun cellTime(millis: Long) = TimeFormats.dateTime(millis)

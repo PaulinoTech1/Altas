@@ -1,5 +1,7 @@
 package com.example.atlas.acquisition.nfc
 
+import androidx.compose.runtime.Immutable
+
 data class NdefRecordReport(val tnf: Int, val typeHex: String, val payloadHex: String, val payloadBytes: Int)
 
 data class NfcTagReport(
@@ -20,6 +22,7 @@ data class NfcTagReport(
 
 data class ApduExchange(val atMillis: Long, val commandHex: String, val responseHex: String, val statusWord: String?)
 
+@Immutable // B8: replaced wholesale on every update; never mutated in place.
 data class NfcUiState(
     val reading: Boolean = false,
     val status: String = "Idle — reader mode off",

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +26,6 @@ import com.example.atlas.acquisition.nfc.NfcUiState
 import com.example.atlas.acquisition.nfc.NfcViewModel
 import com.example.atlas.model.RadioCapability
 import java.text.DateFormat
-import java.util.Date
 
 fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: NfcUiState, activity: Activity, sessionNotice: String,
     unsaved: UnsavedCue, onSave: () -> Unit) {
@@ -66,10 +64,13 @@ fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: Nf
         if (state.tags.isEmpty()) Explanation("No physical tag has been read in this session.")
         else OutlinedButton(onClick = vm::clear, enabled = !state.reading) { Text("Clear NFC history") }
     } }
-    itemsIndexed(state.tags, key = { index, tag -> "$index-${tag.observedAtMillis}-${tag.idHex}" }) { _, tag ->
+    // B8: keyed by time + tag id rather than list index, so new tags at the top do not re-key every row.
+    val tagKeys = StableKeys.of(state.tags, { tag -> "tag-${tag.observedAtMillis}-${tag.idHex}" }, { tag -> "tag-${tag.observedAtMillis}" })
+    items(state.tags.size, key = { tagKeys[it] }) { index ->
+        val tag = state.tags[index]
         Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(DateFormat.getDateTimeInstance().format(Date(tag.observedAtMillis)), style = MaterialTheme.typography.titleMedium)
+                Text(TimeFormats.dateTime(tag.observedAtMillis, DateFormat.MEDIUM, DateFormat.MEDIUM), style = MaterialTheme.typography.titleMedium)
                 Text("Tag ID: ${tag.idHex ?: "Unavailable"} · technologies: ${tag.technologies.joinToString().ifEmpty { "Unavailable" }}")
                 if (tag.ndefStatus.contains("failed", ignoreCase = true)) DiagnosticNotice("NFC", tag.ndefStatus)
                 else Text("NDEF: ${tag.ndefStatus}")
@@ -108,7 +109,7 @@ private fun ApduControls(vm: NfcViewModel, state: NfcUiState) {
             confirmButton = { TextButton(enabled = state.reading && !state.apduBusy, onClick = { confirm = false; vm.sendApdu(command) }) { Text("Send") } },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } })
         state.exchanges.take(10).forEach { exchange ->
-            Text("${DateFormat.getTimeInstance().format(Date(exchange.atMillis))} · command ${exchange.commandHex} · response ${exchange.responseHex} · SW ${exchange.statusWord ?: "unavailable"}",
+            Text("${TimeFormats.time(exchange.atMillis)} · command ${exchange.commandHex} · response ${exchange.responseHex} · SW ${exchange.statusWord ?: "unavailable"}",
                 style = MaterialTheme.typography.bodySmall)
         }
     }
