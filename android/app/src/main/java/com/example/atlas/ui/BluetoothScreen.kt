@@ -242,7 +242,7 @@ private fun DeviceRow(device: BleDeviceHistory, spark: List<Int>, expanded: Bool
                 Text("Age at arrival: ${event.ageMillis(event.receivedElapsedNanos)?.let { "${it}ms" } ?: "unavailable"}. Retained snapshot; not a live current signal.")
                 val fix = event.phoneGpsFix
                 Text(if (fix == null) "Pixel GPS origin: no fresh GNSS fix for this observation."
-                    else String.format(Locale.ROOT, "Pixel GPS origin: %.6f, %.6f ±%.0f m (horizontal)",
+                    else String.format(Locale.ROOT, "Pixel GPS origin: %.5f, %.5f ±%.0f m (horizontal)",
                         fix.latitude, fix.longitude, fix.horizontalAccuracyMeters))
                 Text("Connectable: ${event.connectable}")
                 Text("Advertised services: ${event.advertisement.serviceUuids.joinToString().ifEmpty { "None reported" }}")
