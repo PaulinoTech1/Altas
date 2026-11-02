@@ -126,7 +126,8 @@ fun AtlasApp(
             item {
                 Text(selected?.type?.title ?: if (page == "Dashboard") "Overview" else page, style = MaterialTheme.typography.headlineLarge,
                     modifier = Modifier.semantics { heading() })
-                if (page != "Dashboard") TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
+                // History, Settings and Project are peer tabs reached from the nav bar; only radio sub-screens need a way back.
+                if (selected != null) TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
             }
             item {
                 val active = nfcState.reading || cell.collecting || wifi.collecting || ble.scanning || gatt.ready
