@@ -41,7 +41,7 @@ private data class AxisGuide(val name: String, val x: Float, val y: Float, val z
 @Composable
 fun BleOrientationGlobe(
     history: List<BleObservation>, scanning: Boolean, selectedAddress: String?, startedAtMillis: Long?,
-    isolateSelected: Boolean = false, onSelectAddress: (String?) -> Unit
+    isolateSelected: Boolean = false, onIsolationChange: (Boolean) -> Unit = {}, onSelectAddress: (String?) -> Unit
 ) {
     val current = remember(history, scanning, startedAtMillis) {
         if (scanning && startedAtMillis != null) history.filter { it.observedAtMillis >= startedAtMillis } else history
@@ -168,6 +168,9 @@ fun BleOrientationGlobe(
             OutlinedButton(onClick = { selectedEventId = candidates[chosenIndex - 1].eventId },
                 enabled = chosenIndex > 0) { Text("Newer point") }
             OutlinedButton(onClick = { yaw = 0.55f; pitch = -0.35f; zoom = 1f }) { Text("Reset view") }
+            if (selectedAddress != null) OutlinedButton(onClick = { onIsolationChange(!isolateSelected) }) {
+                Text(if (isolateSelected) "Show other signatures" else "Isolate selected signature")
+            }
             if (selectedAddress != null) OutlinedButton(onClick = { selectedEventId = null; onSelectAddress(null) }) {
                 Text("Show all devices")
             }
