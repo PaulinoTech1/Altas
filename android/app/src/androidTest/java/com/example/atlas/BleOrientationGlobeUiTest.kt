@@ -22,6 +22,23 @@ import org.junit.Test
 class BleOrientationGlobeUiTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun isolationShowsOnlySelectedAddressAndPixelGpsLabel() {
+        val samples = listOf(
+            BleObservation("a", "AA", 2L, 2L, null, -50, true, Advertisement(),
+                phoneOrientation = PhoneOrientation(0f, 0f, 1f, 2L), orientationSessionId = "scan"),
+            BleObservation("b", "BB", 1L, 1L, null, -70, true, Advertisement(),
+                phoneOrientation = PhoneOrientation(0f, 0f, 1f, 1L), orientationSessionId = "scan")
+        )
+        compose.setContent {
+            MaterialTheme { BleOrientationGlobe(samples, false, "AA", null, isolateSelected = true) { } }
+        }
+        val description = compose.onNodeWithTag("ble-orientation-globe")
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
+        org.junit.Assert.assertTrue(description.contains("1 visible paired BLE samples"))
+        compose.onNodeWithText("Pixel GPS fix unavailable", substring = true).assertExists()
+        compose.onNodeWithText("1 visible paired samples", substring = true).assertExists()
+    }
+
     @Test fun tapAndTraversalExposeExactDbm() {
         var chosenAddress: String? = null
         val samples = listOf(
