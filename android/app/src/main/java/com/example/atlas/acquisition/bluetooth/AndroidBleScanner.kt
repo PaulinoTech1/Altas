@@ -129,6 +129,8 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
                 }
             } catch (_: IllegalArgumentException) {
                 // A missing GPS provider must not prevent BLE scanning.
+            } catch (_: SecurityException) {
+                // A GPS-specific denial must not prevent the existing BLE scan.
             }
             // Bluetooth broadcasts may originate from a separate privileged UID.
             ContextCompat.registerReceiver(app, receiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED).apply {
