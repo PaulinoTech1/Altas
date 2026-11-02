@@ -19,6 +19,7 @@ import com.example.atlas.model.PermissionState
 import com.example.atlas.model.RadioType
 import com.example.atlas.permissions.RadioPermissionManager
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +36,46 @@ import kotlinx.coroutines.runBlocking
 @RunWith(AndroidJUnit4::class)
 class DashboardInstrumentedTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+
+    private companion object {
+        /**
+         * Only the plain "Deny" button. Anchored at both ends so it can never match
+         * permission_deny_and_dont_ask_again_button, which permanently denies the
+         * permission on the device (audit finding A1-003).
+         */
+        val PLAIN_DENY: Pattern = Pattern.compile("^[\\w.]+:id/permission_deny_button$")
+        val DONT_ASK_AGAIN: Pattern = Pattern.compile("^[\\w.]+:id/permission_deny_and_dont_ask_again_button$")
+        /** Detection only (never clicked): any allow or deny control of an open OS permission dialog. */
+        val ANY_PERMISSION_CONTROL: Pattern = Pattern.compile(".*:id/permission_(allow|deny).*")
+
+        /**
+         * Tests that open a real OS permission dialog are opt-in, so a run on a personal
+         * phone never changes its permission state by default. Enable with
+         * `am instrument -e atlasAllowPermissionDialogs true ...` on an emulator or test device.
+         */
+        fun permissionDialogsAllowed(): Boolean =
+            InstrumentationRegistry.getArguments().getString("atlasAllowPermissionDialogs") == "true"
+    }
+
+    /**
+     * Presses the plain "Deny" button of an open permission dialog, at most once.
+     * Returns true if it denied. If Android only offers "Deny & don't ask again", it
+     * dismisses the dialog with Back (which does not set the fixed flag) and skips the test.
+     */
+    private fun denyOnceSafely(device: UiDevice, timeoutMs: Long): Boolean {
+        val deny = device.wait(Until.findObject(By.res(PLAIN_DENY)), timeoutMs)
+        if (deny != null) {
+            Log.i("AtlasPermissionValidation", "Denial control: ${deny.resourceName}")
+            deny.click()
+            return true
+        }
+        if (device.hasObject(By.res(DONT_ASK_AGAIN))) {
+            Log.w("AtlasPermissionValidation", "Only 'don't ask again' offered; not pressed, dismissing with Back")
+            device.pressBack()
+            assumeTrue("Android only offered 'Deny & don't ask again'; skipped to protect device state", false)
+        }
+        return false
+    }
 
     @Test fun persistentNavigationPreservesPageAndLeavesCollectorsIdle() {
         listOf("nav-dashboard", "nav-history", "nav-settings", "nav-project").forEach {
@@ -73,15 +114,14 @@ class DashboardInstrumentedTest {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         // Preserve an existing user grant. On a clean install test denial through the OS dialog.
         if (permissions.state(RadioType.BLUETOOTH) == PermissionState.GRANTED) return
+        assumeTrue("Permission-dialog tests are opt-in", permissionDialogsAllowed())
         assertFalse(device.hasObject(By.res("com.android.permissioncontroller", "permission_allow_button")))
         compose.onNodeWithText("Open Bluetooth").performScrollTo().performClick()
         compose.onNodeWithText("Check Bluetooth state").performScrollTo().performClick()
-        val deny = device.wait(Until.findObject(By.res(Pattern.compile(".*:id/permission_deny.*"))), 5000)
-        if (deny != null) {
-            deny.click()
+        if (denyOnceSafely(device, 5000)) {
             Log.i("AtlasPermissionValidation", "Nearby devices: ordinary denial dialog tested")
         } else {
-            assertFalse("Unexpected unresolved permission dialog", device.hasObject(By.res(Pattern.compile(".*:id/permission_(allow.*|deny.*)"))))
+            assertFalse("Unexpected unresolved permission dialog", device.hasObject(By.res(ANY_PERMISSION_CONTROL)))
             assertFalse("Android should not offer rationale for the blocked permission", compose.activity.shouldShowRequestPermissionRationale(android.Manifest.permission.BLUETOOTH_CONNECT))
             compose.onNodeWithText(compose.activity.getString(R.string.permission_settings_help)).performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("App permission settings").performScrollTo().assertIsDisplayed()
@@ -95,6 +135,7 @@ class DashboardInstrumentedTest {
     @Test fun wifiPermissionDenialLeavesCollectionDisabled() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext
         if (RadioPermissionManager(app).missingForWifiSurvey().isEmpty()) return
+        assumeTrue("Permission-dialog tests are opt-in", permissionDialogsAllowed())
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Open Wi-Fi"))
         compose.onNodeWithText("Open Wi-Fi").performClick()
@@ -102,9 +143,7 @@ class DashboardInstrumentedTest {
         compose.onNodeWithText("Start Wi-Fi survey").assertIsNotEnabled()
         compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Review Wi-Fi permissions"))
         compose.onNodeWithText("Review Wi-Fi permissions").performClick()
-        val deny = device.wait(Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")), 5000)
-        assertNotNull("Expected user-triggered location dialog", deny)
-        deny.click()
+        assertTrue("Expected user-triggered location dialog", denyOnceSafely(device, 5000))
         compose.waitForIdle()
         compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Start Wi-Fi survey"))
         compose.onNodeWithText("Start Wi-Fi survey").assertIsNotEnabled()
@@ -113,26 +152,22 @@ class DashboardInstrumentedTest {
     @Test fun cellularPermissionDenialLeavesCollectionDisabled() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext
         if (RadioPermissionManager(app).missingForCellular().isEmpty()) return
+        assumeTrue("Permission-dialog tests are opt-in", permissionDialogsAllowed())
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Open Cellular"))
         compose.onNodeWithText("Open Cellular").performClick()
         compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Review cellular permissions"))
         compose.onNodeWithText("Review cellular permissions").performClick()
         var denied = 0
-        val denialSelector = By.res(Pattern.compile(".*:id/permission_deny.*"))
         repeat(4) {
-            val deny = device.wait(Until.findObject(denialSelector), 1500)
-            if (deny != null) {
-                try {
-                    Log.i("AtlasPermissionValidation", "Cellular denial control: ${deny.resourceName}")
-                    deny.click(); denied++
-                } catch (_: StaleObjectException) {
-                    Log.i("AtlasPermissionValidation", "OS permission dialog transitioned; reacquiring within bounded attempts")
-                }
+            try {
+                if (denyOnceSafely(device, 1500)) denied++
+            } catch (_: StaleObjectException) {
+                Log.i("AtlasPermissionValidation", "OS permission dialog transitioned; reacquiring within bounded attempts")
             }
         }
         assertTrue("Expected contextual permission dialog", denied > 0)
-        assertFalse("An unresolved permission dialog remains", device.hasObject(denialSelector))
+        assertFalse("An unresolved permission dialog remains", device.hasObject(By.res(ANY_PERMISSION_CONTROL)))
         compose.waitForIdle()
         compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Start cellular collection"))
         compose.onNodeWithText("Start cellular collection").assertIsNotEnabled()
