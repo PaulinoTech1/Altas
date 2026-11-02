@@ -124,10 +124,12 @@ fun AtlasApp(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text(selected?.type?.title ?: if (page == "Dashboard") "Overview" else page, style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.semantics { heading() })
-                // History, Settings and Project are peer tabs reached from the nav bar; only radio sub-screens need a way back.
-                if (selected != null) TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
+                Pairs {
+                    Text(selected?.type?.title ?: if (page == "Dashboard") "Overview" else page, style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.semantics { heading() })
+                    // History, Settings and Project are peer tabs reached from the nav bar; only radio sub-screens need a way back.
+                    if (selected != null) TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
+                }
             }
             // Active sessions are announced on every page (the "Leaving X stops…" copy is a safety notice). When idle, only
             // Overview and the radio screens get a one-line note; History, Settings and Project show nothing.
@@ -171,13 +173,15 @@ fun AtlasApp(
                 )
                 selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity)
                 selected != null -> item {
-                    RadioDetails(selected)
-                    if (selected.type == RadioType.BLUETOOTH && selected.permission == PermissionState.REQUIRED) {
-                        Text("Nearby devices permission is used here only to read Bluetooth enabled state. Denial leaves state unknown.")
-                        Button(onClick = { onRequestPermission(selected.type) }) { Text("Check Bluetooth state") }
+                    ItemColumn {
+                        RadioDetails(selected)
+                        if (selected.type == RadioType.BLUETOOTH && selected.permission == PermissionState.REQUIRED) {
+                            Text("Nearby devices permission is used here only to read Bluetooth enabled state. Denial leaves state unknown.")
+                            Button(onClick = { onRequestPermission(selected.type) }) { Text("Check Bluetooth state") }
+                        }
+                        OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh state") }
+                        TextButton(onClick = onAppSettings) { Text("App permission settings") }
                     }
-                    OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh state") }
-                    TextButton(onClick = onAppSettings) { Text("App permission settings") }
                 }
                 page == "History" -> telemetryHistory(storage, savedHistory, telemetry) {
                     // Capture immutable session snapshots before dispatching normalization off the UI thread.
@@ -208,21 +212,23 @@ fun AtlasApp(
                     storageSettings(storage, telemetry, onExport)
                     item {
                         var showDetails by rememberSaveable { mutableStateOf(false) }
-                        TextButton(onClick = { showDetails = !showDetails }) { Text("Device & collection details") }
-                        if (showDetails) {
-                            Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
-                            Text("Minimum API 31 · Target API 37 · Development preview")
-                            Text("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
-                            Text("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
-                            Text("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
-                            Text("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")
-                            Text("NFC reader mode uses explicit 60-second foreground sessions. Up to 32 tag reports and 20 APDU exchanges remain in memory; APDU payloads are never saved to telemetry.")
-                            TextButton(onClick = onAppSettings) { Text("App permission settings") }
+                        ItemColumn {
+                            TextButton(onClick = { showDetails = !showDetails }) { Text("Device & collection details") }
+                            if (showDetails) {
+                                Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
+                                Text("Minimum API 31 · Target API 37 · Development preview")
+                                Text("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
+                                Text("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
+                                Text("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
+                                Text("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")
+                                Text("NFC reader mode uses explicit 60-second foreground sessions. Up to 32 tag reports and 20 APDU exchanges remain in memory; APDU payloads are never saved to telemetry.")
+                                TextButton(onClick = onAppSettings) { Text("App permission settings") }
+                            }
                         }
                     }
                 }
                 else -> {
-                    item {
+                    item { Pairs {
                         Text("Choose a radio", style = MaterialTheme.typography.titleLarge)
                         Text("Review permissions, start a session, then stop. Open History to save your measurements.", style = MaterialTheme.typography.bodyMedium)
                         Text(when {
@@ -231,9 +237,9 @@ fun AtlasApp(
                             else -> "${storage.count} records saved on this device"
                         }, style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary)
-                    }
+                    } }
                     items(state.radios.sortedBy { it.type == RadioType.NFC }, key = { it.type }) { radio ->
-                        Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
+                        Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
                             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

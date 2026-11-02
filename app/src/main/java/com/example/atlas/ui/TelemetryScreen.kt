@@ -16,32 +16,40 @@ import java.util.Date
 
 fun LazyListScope.storageStatus(state: TelemetryUiState) {
     item {
-        Text("Saved records: ${state.count}", style = MaterialTheme.typography.titleMedium)
-        if (!state.loaded && state.error == null) Text("Opening private telemetry storage…")
-        state.message?.let { Text(it) }
-        state.error?.let { DiagnosticNotice("STORAGE", it) }
-        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        ItemColumn {
+            Text("Saved records: ${state.count}", style = MaterialTheme.typography.titleMedium)
+            if (!state.loaded && state.error == null) Text("Opening private telemetry storage…")
+            state.message?.let { Text(it) }
+            state.error?.let { DiagnosticNotice("STORAGE", it) }
+            if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
     }
 }
 
 fun LazyListScope.telemetryHistory(state: TelemetryUiState, rows: List<Measurement>, vm: TelemetryViewModel, onSave: () -> Unit) {
     storageStatus(state)
     item {
-        Text("Radio histories are temporary until explicitly saved. Saving does not start collection. GATT payloads are not persisted in this phase.")
-        Button(onClick = onSave, enabled = state.loaded && !state.busy) { Text("Save session measurements") }
-        TextButton(onClick = vm::refresh, enabled = state.loaded && !state.busy) { Text("Apply retention now") }
-        Text(if (state.count == 0) "No measurements collected" else "Showing up to 200 matching saved records per page, newest first.")
-        HistoryFilter(vm)
-        val page by vm.historyPage.collectAsStateWithLifecycle()
-        Text("History page $page")
-        Row {
-            TextButton(onClick = { vm.page(-1) }, enabled = page > 1) { Text("Previous page") }
-            TextButton(onClick = { vm.page(1) }, enabled = rows.size == 200 && page < 250) { Text("Next page") }
+        SectionCard {
+            Text("Radio histories are temporary until explicitly saved. Saving does not start collection. GATT payloads are not persisted in this phase.")
+            Button(onClick = onSave, enabled = state.loaded && !state.busy) { Text("Save session measurements") }
+            TextButton(onClick = vm::refresh, enabled = state.loaded && !state.busy) { Text("Apply retention now") }
+        }
+    }
+    item {
+        ItemColumn {
+            Text(if (state.count == 0) "No measurements collected" else "Showing up to 200 matching saved records per page, newest first.")
+            HistoryFilter(vm)
+            val page by vm.historyPage.collectAsStateWithLifecycle()
+            Text("History page $page")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { vm.page(-1) }, enabled = page > 1) { Text("Previous page") }
+                TextButton(onClick = { vm.page(1) }, enabled = rows.size == 200 && page < 250) { Text("Next page") }
+            }
         }
     }
     items(rows, key = { it.eventId }) { row ->
-        Surface(tonalElevation = 1.dp, shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Surface(Modifier.fillMaxWidth(), tonalElevation = 1.dp, shape = MaterialTheme.shapes.medium) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("${UiText.radioTitle(row.radioType)} · ${row.measurementType}", style = MaterialTheme.typography.titleMedium)
                 Text(row.value?.let { "$it ${row.units.orEmpty()}" }
                     ?: if (row.collectionStatus == "UNAVAILABLE") "Unavailable" else "Unavailable (${UiText.collectionStatus(row.collectionStatus).lowercase()})")
@@ -87,40 +95,45 @@ private fun SettingsControls(state: TelemetryUiState, vm: TelemetryViewModel, on
     var maximum by rememberSaveable(state.preferences.maximumRows) { mutableIntStateOf(state.preferences.maximumRows) }
     var redact by rememberSaveable(state.preferences.redactExport) { mutableStateOf(state.preferences.redactExport) }
     var confirmFullExport by rememberSaveable { mutableStateOf(false) }
-    Text("Private telemetry storage", style = MaterialTheme.typography.titleLarge)
-    Text("Saved identifiers stay in the app sandbox. Backup is disabled. Exports are copied to your chosen provider and are no longer governed by app retention.")
-    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Switch(checked = redact, onCheckedChange = { redact = it }, enabled = !state.busy && state.loaded,
-            modifier = Modifier.testTag("export-redaction"))
-        Text("Redact identifiers and all metadata in exports")
+    ItemColumn {
+        SectionCard {
+            Text("Private telemetry storage", style = MaterialTheme.typography.titleLarge)
+            Text("Saved identifiers stay in the app sandbox. Backup is disabled. Exports are copied to your chosen provider and are no longer governed by app retention.")
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Switch(checked = redact, onCheckedChange = { redact = it }, enabled = !state.busy && state.loaded,
+                    modifier = Modifier.testTag("export-redaction"))
+                Text("Redact identifiers and all metadata in exports")
+            }
+            if (!redact) Text("Full exports include observed device/network/cell identifiers, names and advertisement metadata. Share only intentionally.", color = MaterialTheme.colorScheme.error)
+            OutlinedButton(onClick = { if (redact) onExport(true) else confirmFullExport = true }, enabled = state.loaded && !state.busy) {
+                Text(if (redact) "Export redacted JSON" else "Export JSON including identifiers")
+            }
+            if (confirmFullExport) {
+                AlertDialog(
+                    onDismissRequest = { confirmFullExport = false },
+                    title = { Text("Export identifiers?") },
+                    text = { Text("This copy includes saved Bluetooth addresses, Wi-Fi network identifiers, cell identifiers, names and advertisement metadata. The chosen document provider controls the exported file. Continue only if you intend to share this information.") },
+                    confirmButton = {
+                        TextButton(enabled = state.loaded && !state.busy, onClick = {
+                            confirmFullExport = false
+                            onExport(false)
+                        }) { Text("Choose export location") }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmFullExport = false }) { Text("Cancel") } }
+                )
+            }
+            Text("Export includes all saved records after retention, regardless of the History filter. Redaction does not anonymize signal patterns or timestamps.")
+        }
+        SectionCard {
+            Text("Retention: ${UiText.days(days)}; maximum ${UiText.count(maximum, "measurement record")}")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1, 7, 30).forEach { value -> FilterChip(selected = days == value, onClick = { days = value }, label = { Text(UiText.days(value)) }) }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1000, 10000, 50000).forEach { value -> FilterChip(selected = maximum == value, onClick = { maximum = value }, label = { Text(UiText.records(value)) }) }
+            }
+            Text("Applying retention permanently removes older/excess saved records. Temporary radio histories remain until cleared or the app process ends.")
+            Button(onClick = { vm.configure(StoragePreferences(days, maximum, redact)) }, enabled = state.loaded && !state.busy) { Text("Apply storage preferences") }
+        }
     }
-    if (!redact) Text("Full exports include observed device/network/cell identifiers, names and advertisement metadata. Share only intentionally.", color = MaterialTheme.colorScheme.error)
-    OutlinedButton(onClick = { if (redact) onExport(true) else confirmFullExport = true }, enabled = state.loaded && !state.busy) {
-        Text(if (redact) "Export redacted JSON" else "Export JSON including identifiers")
-    }
-    if (confirmFullExport) {
-        AlertDialog(
-            onDismissRequest = { confirmFullExport = false },
-            title = { Text("Export identifiers?") },
-            text = { Text("This copy includes saved Bluetooth addresses, Wi-Fi network identifiers, cell identifiers, names and advertisement metadata. The chosen document provider controls the exported file. Continue only if you intend to share this information.") },
-            confirmButton = {
-                TextButton(enabled = state.loaded && !state.busy, onClick = {
-                    confirmFullExport = false
-                    onExport(false)
-                }) { Text("Choose export location") }
-            },
-            dismissButton = { TextButton(onClick = { confirmFullExport = false }) { Text("Cancel") } }
-        )
-    }
-    Text("Export includes all saved records after retention, regardless of the History filter. Redaction does not anonymize signal patterns or timestamps.")
-    HorizontalDivider(Modifier.padding(vertical = 12.dp))
-    Text("Retention: ${UiText.days(days)}; maximum ${UiText.count(maximum, "measurement record")}")
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(1, 7, 30).forEach { value -> FilterChip(selected = days == value, onClick = { days = value }, label = { Text(UiText.days(value)) }) }
-    }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(1000, 10000, 50000).forEach { value -> FilterChip(selected = maximum == value, onClick = { maximum = value }, label = { Text(UiText.records(value)) }) }
-    }
-    Text("Applying retention permanently removes older/excess saved records. Temporary radio histories remain until cleared or the app process ends.")
-    Button(onClick = { vm.configure(StoragePreferences(days, maximum, redact)) }, enabled = state.loaded && !state.busy) { Text("Apply storage preferences") }
 }

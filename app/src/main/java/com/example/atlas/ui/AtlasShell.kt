@@ -99,8 +99,10 @@ private fun NavigationGlyph(section: AtlasSection, color: Color) {
 
 fun LazyListScope.projectContent() {
     item {
-        Text("Built to grow", style = MaterialTheme.typography.titleLarge)
-        Text("Atlas uses separate acquisition modules and a shared telemetry format. New modules can be added without replacing your saved history.")
+        ItemColumn {
+            Text("Built to grow", style = MaterialTheme.typography.titleLarge)
+            Text("Atlas uses separate acquisition modules and a shared telemetry format. New modules can be added without replacing your saved history.")
+        }
     }
     item { ProjectFeature("Available in this preview", "BLE discovery and advertisements; Wi-Fi surveys; reported cellular measurements; foreground NFC reader; local saves, history and JSON export. Hardware results depend on permissions and what Android supplies.") }
     item { ProjectFeature("NFC reader · Tag discovery verified", "The Pixel detected an authorized YubiKey 5C NFC as NfcA and IsoDep in metadata-only mode. NDEF content reading and ISO-DEP APDU exchange remain unverified.") }
@@ -108,14 +110,16 @@ fun LazyListScope.projectContent() {
     item { ProjectFeature("LTE and dual SIM · Coverage pending", "NR measurements have been observed on this Pixel. LTE-specific measurements and two active SIMs still need suitable network conditions for verification.") }
     item { ProjectFeature("External instruments · Future", "Raspberry Pi, Arduino and USB instruments remain future work. No remote service or external-hardware connection is enabled.") }
     item {
-        Text("Build ${stringResource(R.string.atlas_version)}", style = MaterialTheme.typography.labelLarge)
-        Text("Development preview. Collections are user initiated and stop when their radio screen or the app is left. Unsaved session histories are temporary.")
+        ItemColumn {
+            Text("Build ${stringResource(R.string.atlas_version)}", style = MaterialTheme.typography.labelLarge)
+            Text("Development preview. Collections are user initiated and stop when their radio screen or the app is left. Unsaved session histories are temporary.")
+        }
     }
 }
 
 @Composable
 private fun ProjectFeature(title: String, detail: String) {
-    Surface(tonalElevation = 1.dp, shape = MaterialTheme.shapes.medium) {
+    Surface(Modifier.fillMaxWidth(), tonalElevation = 1.dp, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(detail, style = MaterialTheme.typography.bodyMedium)

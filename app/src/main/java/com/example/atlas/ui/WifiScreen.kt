@@ -35,13 +35,19 @@ fun LazyListScope.wifiContent(
     openSettings: () -> Unit
 ) {
     item {
-        Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
-        Text("Capability check: ${radio.state.label}")
-        Text("Survey permission: ${if (missingPermissions.isEmpty()) "Granted" else "Precise location needed"}")
-        Text("Wi-Fi surveying can reveal location. Android requires precise location permission and enabled location services.")
-        OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
-        TextButton(onClick = openSettings) { Text("App permission settings") }
-        if (missingPermissions.isNotEmpty()) PermissionGuidance()
+        SectionCard {
+            Pairs {
+                Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
+                Text("Capability check: ${radio.state.label}")
+                Text("Survey permission: ${if (missingPermissions.isEmpty()) "Granted" else "Precise location needed"}")
+            }
+            Text("Wi-Fi surveying can reveal location. Android requires precise location permission and enabled location services.")
+            OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
+            TextButton(onClick = openSettings) { Text("App permission settings") }
+            if (missingPermissions.isNotEmpty()) PermissionGuidance()
+        }
+    }
+    item { ItemColumn {
         if (state.collecting) {
             Button(onClick = { viewModel.stop() }) { Text("Stop Wi-Fi survey") }
             OutlinedButton(onClick = viewModel::requestScan) { Text("Request Wi-Fi scan") }
@@ -56,8 +62,8 @@ fun LazyListScope.wifiContent(
         Text("Sessions stop after 60 seconds. No automatic retries. Requests are spaced by at least 30 seconds and limited to four per two minutes; Android can further restrict scans.", style = MaterialTheme.typography.bodySmall)
         Text("Stop unregisters Atlas callbacks. Android provides no cancellation API for a hardware scan already requested.", style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear Wi-Fi history") }
-    }
-    item {
+    } }
+    item { ItemColumn {
         Text("Survey summary", style = MaterialTheme.typography.titleLarge)
         Text("${state.rows.size} displayed AP rows / ${state.totalRows} reported · ${state.history.size}/1024 distinct source samples retained")
         Text("${state.updatedBroadcasts} updated platform broadcasts / ${state.scanBroadcasts} total. Broadcasts are shared across apps; an update is not proof this app caused the scan.")
@@ -65,14 +71,14 @@ fun LazyListScope.wifiContent(
         Text("AP counts by channel (not channel utilization)", style = MaterialTheme.typography.titleSmall)
         val channels = state.rows.filter { it.channel != null }.groupingBy { "${WifiValues.band(it.frequencyMhz)} / ${it.channel}" }.eachCount()
         Text(channels.toSortedMap().entries.joinToString(" · ") { "${it.key}: ${it.value}" }.ifEmpty { "No valid channels reported" })
-    }
-    item {
+    } }
+    item { ItemColumn {
         Text("Reported Wi-Fi connections", style = MaterialTheme.typography.titleLarge)
         Text("Link rates are reported connection properties, not measured throughput. Connection snapshots are retained after Stop.", style = MaterialTheme.typography.bodySmall)
         if (state.connections.isEmpty()) Text("No Wi-Fi connection information delivered in this session. No connection, permission redaction, or a pending callback are possible.")
-    }
+    } }
     items(state.connections, key = { "connection-${it.key}" }) { connection ->
-        Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
+        Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(connection.ssid ?: "SSID unavailable / redacted", style = MaterialTheme.typography.titleMedium)
                 Text("BSSID: ${connection.bssid ?: "Unavailable / redacted"}")
@@ -84,11 +90,11 @@ fun LazyListScope.wifiContent(
             }
         }
     }
-    item {
+    item { ItemColumn {
         Text("Access points", style = MaterialTheme.typography.titleLarge)
         Text("Source timestamps determine age; rows become stale after 30 seconds. Empty SSIDs may be hidden or redacted. Channel numbers do not establish regional authorization.", style = MaterialTheme.typography.bodySmall)
         if (state.rows.isEmpty()) Text("No access points reported. Cache may be empty, or a scan may be pending, restricted or unsupported.")
-    }
+    } }
     items(state.rows, key = { "ap-${it.eventId}" }) { row ->
         Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

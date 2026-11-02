@@ -39,39 +39,49 @@ fun LazyListScope.bluetoothContent(
     openSettings: () -> Unit
 ) {
     item {
-        Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
-        Text("State: ${radio.state.label}")
-        val missingLabels = buildList {
-            if (missingPermissions.any { it.contains("BLUETOOTH_") }) add("Nearby devices")
-            if (missingPermissions.any { it.endsWith("_LOCATION") }) add("Precise location")
+        SectionCard {
+            Pairs {
+                Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)
+                Text("State: ${radio.state.label}")
+                val missingLabels = buildList {
+                    if (missingPermissions.any { it.contains("BLUETOOTH_") }) add("Nearby devices")
+                    if (missingPermissions.any { it.endsWith("_LOCATION") }) add("Precise location")
+                }
+                Text("Survey permissions: ${if (missingLabels.isEmpty()) "Granted" else "Needed: ${missingLabels.joinToString()}"}")
+            }
+            if (radio.permission == PermissionState.REQUIRED) {
+                Button(onClick = requestStatePermission) { Text("Check Bluetooth state") }
+            }
+            Text("RF surveying uses Nearby devices and precise location. Granting permission does not start collection.")
+            OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
+            TextButton(onClick = openSettings) { Text("App permission settings") }
+            if (missingPermissions.isNotEmpty()) PermissionGuidance()
         }
-        Text("Survey permissions: ${if (missingLabels.isEmpty()) "Granted" else "Needed: ${missingLabels.joinToString()}"}")
-        if (radio.permission == PermissionState.REQUIRED) {
-            Button(onClick = requestStatePermission) { Text("Check Bluetooth state") }
-        }
-        Text("RF surveying uses Nearby devices and precise location. Granting permission does not start collection.")
-        OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
-        TextButton(onClick = openSettings) { Text("App permission settings") }
-        if (missingPermissions.isNotEmpty()) PermissionGuidance()
     }
     item {
-        Text("BLE collection", style = MaterialTheme.typography.titleLarge)
-        BleControls(state, viewModel, missingPermissions.isEmpty())
-        Text(state.status)
-        state.error?.let { DiagnosticNotice("BLE", it) }
-        Text("${state.devices.size} retained addresses · ${state.receivedCount} received observations · ${state.history.size}/1024 history entries")
-        Text("No automatic restart. 10-second restart cooldown; Android may impose further limits. Addresses can rotate. This is not lossless packet capture.",
-            style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
+        ItemColumn {
+            Text("BLE collection", style = MaterialTheme.typography.titleLarge)
+            BleControls(state, viewModel, missingPermissions.isEmpty())
+            Text(state.status)
+            state.error?.let { DiagnosticNotice("BLE", it) }
+            Text("${state.devices.size} retained addresses · ${state.receivedCount} received observations · ${state.history.size}/1024 history entries")
+            Text("No automatic restart. 10-second restart cooldown; Android may impose further limits. Addresses can rotate. This is not lossless packet capture.",
+                style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
+        }
     }
     item {
-        Text("GATT: ${gatt.status}", style = MaterialTheme.typography.titleLarge)
-        gatt.address?.let { Text("Selected connection: $it") }
-        gatt.error?.let { DiagnosticNotice("GATT", it) }
-        if (gatt.address != null) OutlinedButton(onClick = viewModel.gatt::disconnect) { Text("Disconnect GATT") }
-        Text("Connect only to a device you own or are authorized to inspect. No app-driven pairing, writes to characteristic values or automatic reconnection. Protected reads may require Android authorization.")
-        gatt.serviceUuids.forEach { Text("Service: $it", style = MaterialTheme.typography.bodySmall) }
-        if (gatt.truncated) Text("Service/characteristic list capped at 128 services / 512 characteristics.")
+        ItemColumn {
+            Text("GATT: ${gatt.status}", style = MaterialTheme.typography.titleLarge)
+            gatt.address?.let { Text("Selected connection: $it") }
+            gatt.error?.let { DiagnosticNotice("GATT", it) }
+            if (gatt.address != null) OutlinedButton(onClick = viewModel.gatt::disconnect) { Text("Disconnect GATT") }
+            Text("Connect only to a device you own or are authorized to inspect. No app-driven pairing, writes to characteristic values or automatic reconnection. Protected reads may require Android authorization.")
+            Pairs {
+                gatt.serviceUuids.forEach { Text("Service: $it", style = MaterialTheme.typography.bodySmall) }
+            }
+            if (gatt.truncated) Text("Service/characteristic list capped at 128 services / 512 characteristics.")
+        }
     }
     items(gatt.characteristics, key = { "gatt-${it.key}" }) { characteristic ->
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -109,7 +119,7 @@ fun LazyListScope.bluetoothContent(
 
 @Composable
 private fun BleControls(state: BluetoothUiState, viewModel: BluetoothViewModel, permissionsGranted: Boolean) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(10, 20, 30).forEach { seconds ->
                 FilterChip(selected = state.config.seconds == seconds, enabled = !state.scanning,
