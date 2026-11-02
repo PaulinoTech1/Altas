@@ -74,7 +74,7 @@ fun AtlasNavigation(page: String, historyBadge: Boolean = false, navigate: (Stri
                         NavigationGlyph(section, if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                label = { Text(section.label, maxLines = 1) },
+                label = { Text(section.label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
                 modifier = Modifier.testTag("nav-${section.page.lowercase()}"))
         }
     }

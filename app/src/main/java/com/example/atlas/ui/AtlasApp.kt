@@ -7,6 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.clip
@@ -134,7 +136,8 @@ fun AtlasApp(
     }) { padding ->
         LazyColumn(
             state = pageListState,
-            modifier = Modifier.fillMaxSize().padding(padding).testTag("atlas-content"),
+            // B9: edge-to-edge (API 35+) does not resize for the keyboard, so pad the list for the IME beyond the Scaffold insets.
+            modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().testTag("atlas-content"),
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -312,7 +315,8 @@ private fun OverviewCard(radio: RadioCapability, status: RadioStatus, summary: S
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                 itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Text(radio.type.title, style = MaterialTheme.typography.titleMedium)
                     StatusChip(status)
                 }
