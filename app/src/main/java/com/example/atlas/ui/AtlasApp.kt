@@ -129,16 +129,29 @@ fun AtlasApp(
                 // History, Settings and Project are peer tabs reached from the nav bar; only radio sub-screens need a way back.
                 if (selected != null) TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
             }
-            item {
-                val active = nfcState.reading || cell.collecting || wifi.collecting || ble.scanning || gatt.ready
-                AtlasSessionBanner(active, when {
-                        nfcState.reading -> "NFC reader active. Leaving NFC stops reader mode."
-                        cell.collecting -> "Cellular collection active. Leaving Cellular stops app collection."
-                        wifi.collecting -> "Wi-Fi survey active. Leaving Wi-Fi stops app collection."
-                        ble.scanning -> "BLE collection active. Leaving Bluetooth stops collection."
-                        gatt.ready -> "Bluetooth connected. Leaving Bluetooth disconnects the device."
-                        else -> "All collectors idle. Choose a radio to begin."
-                    })
+            // Active sessions are announced on every page (the "Leaving X stops…" copy is a safety notice). When idle, only
+            // Overview and the radio screens get a one-line note; History, Settings and Project show nothing.
+            val sessionMessage = when {
+                nfcState.reading -> "NFC reader active. Leaving NFC stops reader mode."
+                cell.collecting -> "Cellular collection active. Leaving Cellular stops app collection."
+                wifi.collecting -> "Wi-Fi survey active. Leaving Wi-Fi stops app collection."
+                ble.scanning -> "BLE collection active. Leaving Bluetooth stops collection."
+                gatt.ready -> "Bluetooth connected. Leaving Bluetooth disconnects the device."
+                else -> null
+            }
+            val idleMessage = when {
+                sessionMessage != null -> null
+                page == "Dashboard" -> "All collectors idle. Choose a radio to begin."
+                else -> when (selected?.type) {
+                    RadioType.BLUETOOTH -> "Bluetooth idle. Nothing is collected until you start a BLE scan."
+                    RadioType.WIFI -> "Wi-Fi idle. Nothing is collected until you start a survey."
+                    RadioType.CELLULAR -> "Cellular idle. Nothing is collected until you start collection."
+                    RadioType.NFC -> "NFC idle. Tags are read only after you start the reader."
+                    null -> null
+                }
+            }
+            if (sessionMessage != null || idleMessage != null) item(key = "session-banner") {
+                AtlasSessionBanner(active = sessionMessage != null, message = sessionMessage ?: idleMessage.orEmpty())
             }
             if (state.refreshing) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             state.error?.let { error -> item { DiagnosticNotice("STATE", error) } }

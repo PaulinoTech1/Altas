@@ -13,6 +13,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.atlas.R
 
@@ -38,18 +41,22 @@ fun AtlasTopBar() {
     }
 }
 
+/** Active: a prominent card. Idle: a single quiet line. Both are polite live regions so TalkBack hears start and stop. */
 @Composable
 fun AtlasSessionBanner(active: Boolean, message: String) {
-    Surface(
-        color = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+    val announce = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+    if (active) Surface(
+        modifier = announce,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         shape = MaterialTheme.shapes.medium
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(if (active) "SESSION ACTIVE" else "READY WHEN YOU ARE", style = MaterialTheme.typography.labelLarge)
+            Text("SESSION ACTIVE", style = MaterialTheme.typography.labelLarge)
             Text(message, style = MaterialTheme.typography.bodyMedium)
         }
-    }
+    } else Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = announce)
 }
 
 @Composable
