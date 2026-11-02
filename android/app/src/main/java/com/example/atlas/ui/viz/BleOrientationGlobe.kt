@@ -57,10 +57,13 @@ fun BleOrientationGlobe(
     var zoom by remember(session) { mutableFloatStateOf(1f) }
     var selectedEventId by remember(session) { mutableStateOf<String?>(null) }
     var isolatedEventId by remember(session) { mutableStateOf<String?>(null) }
-    val visibleSamples = remember(samples, selectedAddress, isolateSelected, isolatedEventId) {
+    val focusedEventId = isolatedEventId?.takeIf { id ->
+        samples.any { it.eventId == id && it.address == selectedAddress }
+    }
+    val visibleSamples = remember(samples, selectedAddress, isolateSelected, focusedEventId) {
         if (!isolateSelected || selectedAddress == null) samples
         else samples.filter {
-            it.address == selectedAddress && (isolatedEventId == null || it.eventId == isolatedEventId)
+            it.address == selectedAddress && (focusedEventId == null || it.eventId == focusedEventId)
         }
     }
     val projected = remember(visibleSamples, yaw, pitch, zoom) {
@@ -171,15 +174,15 @@ fun BleOrientationGlobe(
             OutlinedButton(onClick = {
                 val eventId = candidates[chosenIndex + 1].eventId
                 selectedEventId = eventId
-                if (isolatedEventId != null) isolatedEventId = eventId
+                if (focusedEventId != null) isolatedEventId = eventId
             }, enabled = chosenIndex >= 0 && chosenIndex < candidates.lastIndex) { Text("Older point") }
             OutlinedButton(onClick = {
                 val eventId = candidates[chosenIndex - 1].eventId
                 selectedEventId = eventId
-                if (isolatedEventId != null) isolatedEventId = eventId
+                if (focusedEventId != null) isolatedEventId = eventId
             }, enabled = chosenIndex > 0) { Text("Newer point") }
             OutlinedButton(onClick = { yaw = 0.55f; pitch = -0.35f; zoom = 1f }) { Text("Reset view") }
-            if (isolatedEventId != null && isolateSelected && activeAddress != null)
+            if (focusedEventId != null && isolateSelected && activeAddress != null)
                 OutlinedButton(onClick = { isolatedEventId = null }) { Text("Show other points from this device") }
             if (selectedAddress != null) OutlinedButton(onClick = {
                 isolatedEventId = null
