@@ -36,6 +36,8 @@ fun LazyListScope.bluetoothContent(
     gatt: GattState,
     missingPermissions: List<String>,
     sessionNotice: String,
+    unsaved: UnsavedCue,
+    onSave: () -> Unit,
     requestPermissions: () -> Unit,
     requestStatePermission: () -> Unit,
     openSettings: () -> Unit
@@ -48,6 +50,7 @@ fun LazyListScope.bluetoothContent(
             startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
             counts = "${state.devices.size} devices · ${state.receivedCount} observations",
             notice = sessionNotice,
+            unsaved = unsaved, onSave = onSave,
             summary = {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)

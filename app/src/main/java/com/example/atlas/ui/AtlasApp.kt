@@ -53,7 +53,7 @@ import com.example.atlas.acquisition.wifi.WifiViewModel
 import com.example.atlas.acquisition.cellular.CellularViewModel
 import com.example.atlas.acquisition.nfc.NfcViewModel
 import com.example.atlas.telemetry.TelemetryViewModel
-import com.example.atlas.telemetry.TelemetryNormalizer
+import com.example.atlas.telemetry.UnsavedData
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
@@ -118,7 +118,16 @@ fun AtlasApp(
             }
         }
     }
-    Scaffold(topBar = { AtlasTopBar() }, bottomBar = { AtlasNavigation(page) { page = it } }) { padding ->
+    // B3: what is newer than the last successful save, per radio. Drives the radio-screen cue and the History badge.
+    val unsavedCounts = SessionSave.unsavedCounts(ble, wifi, cell, nfcState, storage.savedThroughMillis)
+    val saveAll = {
+        saveSessionMeasurements(telemetry, bluetooth, wifiSurvey, cellular, nfc,
+            blePermissionsMissing, wifiPermissionsMissing, cellularPermissionsMissing)
+    }
+    fun cue(radio: RadioType) = UnsavedCue(unsavedCounts[radio.name] ?: 0, storage.busy, storage.loaded && storage.error == null)
+    Scaffold(topBar = { AtlasTopBar() }, bottomBar = {
+        AtlasNavigation(page, historyBadge = unsavedCounts.values.any { it > 0 }) { page = it }
+    }) { padding ->
         LazyColumn(
             state = pageListState,
             modifier = Modifier.fillMaxSize().padding(padding).testTag("atlas-content"),
@@ -165,18 +174,18 @@ fun AtlasApp(
             when {
                 page == "Project" -> projectContent()
                 selected?.type == RadioType.BLUETOOTH -> bluetoothContent(
-                    selected, bluetooth, ble, gatt, blePermissionsMissing, radioNotice, onBlePermissions,
+                    selected, bluetooth, ble, gatt, blePermissionsMissing, radioNotice, cue(RadioType.BLUETOOTH), saveAll, onBlePermissions,
                     { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings
                 )
                 selected?.type == RadioType.WIFI -> wifiContent(
-                    selected, wifiSurvey, wifi, wifiPermissionsMissing, wifiNowMicros, radioNotice,
+                    selected, wifiSurvey, wifi, wifiPermissionsMissing, wifiNowMicros, radioNotice, cue(RadioType.WIFI), saveAll,
                     onWifiPermissions, onAppSettings
                 )
                 selected?.type == RadioType.CELLULAR -> cellularContent(
-                    selected, cellular, cell, cellularPermissionsMissing, wifiNowMicros / 1000, radioNotice,
+                    selected, cellular, cell, cellularPermissionsMissing, wifiNowMicros / 1000, radioNotice, cue(RadioType.CELLULAR), saveAll,
                     onCellularPermissions, onAppSettings
                 )
-                selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity, radioNotice)
+                selected?.type == RadioType.NFC -> nfcContent(selected, nfc, nfcState, activity, radioNotice, cue(RadioType.NFC), saveAll)
                 selected != null -> item {
                     ItemColumn {
                         RadioDetails(selected)
@@ -188,31 +197,7 @@ fun AtlasApp(
                         TextButton(onClick = onAppSettings) { Text("App permission settings") }
                     }
                 }
-                page == "History" -> telemetryHistory(storage, savedHistory, telemetry) {
-                    // Capture immutable session snapshots before dispatching normalization off the UI thread.
-                    val bleSnapshot = ble.history
-                    val wifiSnapshot = wifi.history + wifi.rows
-                    val connectionSnapshot = wifi.connections
-                    val cellSnapshot = cell.history + listOfNotNull(cell.cells)
-                    val signalSnapshot = cell.signalHistory + listOfNotNull(cell.signal)
-                    val nfcSnapshot = nfcState.tags
-                    val errors = listOf(Triple("BLUETOOTH", ble.error, blePermissionsMissing), Triple("WIFI", wifi.error, wifiPermissionsMissing), Triple("CELLULAR", cell.error, cellularPermissionsMissing))
-                    val savedAt = System.currentTimeMillis()
-                    telemetry.save {
-                        buildList {
-                            addAll(bleSnapshot.map { TelemetryNormalizer.ble(it, telemetry.bootId) })
-                            addAll(wifiSnapshot.flatMap { TelemetryNormalizer.wifi(it, telemetry.bootId) })
-                            addAll(connectionSnapshot.flatMap { TelemetryNormalizer.connection(it, telemetry.bootId) })
-                            addAll(cellSnapshot.flatMap { TelemetryNormalizer.cells(it, telemetry.bootId) })
-                            addAll(signalSnapshot.flatMap { TelemetryNormalizer.signal(it, telemetry.bootId) })
-                            addAll(nfcSnapshot.flatMap { TelemetryNormalizer.nfc(it, telemetry.bootId) })
-                            errors.forEach { (radio, error, missing) ->
-                                if (error != null) add(TelemetryNormalizer.diagnostic(radio, if (missing.isEmpty()) "FAILED" else "PERMISSION_DENIED",
-                                    if (missing.isEmpty()) "GRANTED_AT_SAVE" else "DENIED_AT_SAVE", savedAt, "Atlas collection state", error))
-                            }
-                        }
-                    }
-                }
+                page == "History" -> telemetryHistory(storage, savedHistory, telemetry, UnsavedData.summary(unsavedCounts), saveAll)
                 page == "Settings" -> {
                     storageSettings(storage, telemetry, onExport)
                     item {

@@ -34,6 +34,8 @@ fun LazyListScope.wifiContent(
     missingPermissions: List<String>,
     nowElapsedMicros: Long,
     sessionNotice: String,
+    unsaved: UnsavedCue,
+    onSave: () -> Unit,
     requestPermissions: () -> Unit,
     openSettings: () -> Unit
 ) {
@@ -44,6 +46,7 @@ fun LazyListScope.wifiContent(
             startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
             counts = "${state.rows.size} access points · ${state.history.size} samples",
             notice = sessionNotice,
+            unsaved = unsaved, onSave = onSave,
             summary = {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium)

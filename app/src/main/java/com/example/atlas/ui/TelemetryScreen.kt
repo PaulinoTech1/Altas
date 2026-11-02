@@ -28,13 +28,15 @@ fun LazyListScope.storageStatus(state: TelemetryUiState) {
     }
 }
 
-fun LazyListScope.telemetryHistory(state: TelemetryUiState, rows: List<Measurement>, vm: TelemetryViewModel, onSave: () -> Unit) {
+fun LazyListScope.telemetryHistory(state: TelemetryUiState, rows: List<Measurement>, vm: TelemetryViewModel, unsavedSummary: String, onSave: () -> Unit) {
     storageStatus(state)
     item {
         SectionCard {
             ExpandableNotice("Session measurements are temporary until you save them.",
                 "Radio histories are temporary until explicitly saved. Saving does not start collection. GATT payloads are not persisted in this phase.")
+            // Never disabled just because nothing is new: a repeat save is harmless (de-duplicated) and tests rely on it.
             Button(onClick = onSave, enabled = state.loaded && !state.busy) { Text("Save session measurements") }
+            Explanation("Saves every radio's temporary history. $unsavedSummary.")
             TextButton(onClick = vm::refresh, enabled = state.loaded && !state.busy) { Text("Apply retention now") }
         }
     }

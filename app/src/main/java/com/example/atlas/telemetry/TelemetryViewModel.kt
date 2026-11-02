@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.*
 
 data class TelemetryUiState(
     val preferences: StoragePreferences = StoragePreferences(), val loaded: Boolean = false,
-    val count: Int = 0, val busy: Boolean = false, val message: String? = null, val error: String? = null
+    val count: Int = 0, val busy: Boolean = false, val message: String? = null, val error: String? = null,
+    /** B3: newest observation timestamp per radio included in a successful save ([UnsavedData]). */
+    val savedThroughMillis: Map<String, Long> = emptyMap()
 )
 
 class TelemetryViewModel(private val repository: TelemetryRepository) : ViewModel() {
@@ -37,9 +39,12 @@ class TelemetryViewModel(private val repository: TelemetryRepository) : ViewMode
 
     fun filter(radio: String, query: String) { filter.value = Triple(radio, query.take(100), 0) }
     fun page(delta: Int) { filter.update { it.copy(third = (it.third + delta * 200).coerceIn(0, 49800)) } }
-    fun save(buildRows: () -> List<Measurement>) = operation("Save failed") {
+    fun save(buildRows: () -> List<Measurement>) = save(emptyMap(), buildRows)
+    /** [savedThrough] markers are committed only after the rows are stored, so a failed save leaves the cue showing. */
+    fun save(savedThrough: Map<String, Long>, buildRows: () -> List<Measurement>) = operation("Save failed") {
         val rows = withContext(Dispatchers.Default) { buildRows() }
         val count = repository.save(rows)
+        mutable.update { it.copy(savedThroughMillis = UnsavedData.merge(it.savedThroughMillis, savedThrough)) }
         "Save finished: $count new records processed. Retention limits applied; repeated observations are ignored."
     }
     fun configure(value: StoragePreferences) = operation("Storage preferences update failed") {

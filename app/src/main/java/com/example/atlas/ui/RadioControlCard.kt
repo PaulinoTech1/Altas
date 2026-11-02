@@ -4,11 +4,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -55,6 +57,8 @@ fun RadioControlCard(
     limitMillis: Long,
     counts: String,
     notice: String,
+    unsaved: UnsavedCue,
+    onSave: () -> Unit,
     summary: @Composable ColumnScope.() -> Unit,
     actions: @Composable ColumnScope.() -> Unit
 ) {
@@ -76,6 +80,23 @@ fun RadioControlCard(
                 color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             actions()
+            if (!active && unsaved.count > 0) UnsavedRow(unsaved, onSave)
+        }
+    }
+}
+
+/**
+ * B3: after a session, "12 observations this session · not saved yet" with Save to History. It runs the same save as
+ * History (all radios). Deliberately not the History button's exact label, which tests match.
+ */
+@Composable
+private fun UnsavedRow(unsaved: UnsavedCue, onSave: () -> Unit) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+        Text("${UiText.count(unsaved.count, "observation")} this session · not saved yet",
+            style = MaterialTheme.typography.bodyMedium)
+        FilledTonalButton(onClick = onSave, enabled = unsaved.available && !unsaved.busy) {
+            Text(if (unsaved.busy) "Saving…" else "Save to History")
         }
     }
 }

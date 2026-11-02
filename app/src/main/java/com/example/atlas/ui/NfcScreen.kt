@@ -29,7 +29,8 @@ import com.example.atlas.model.RadioCapability
 import java.text.DateFormat
 import java.util.Date
 
-fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: NfcUiState, activity: Activity, sessionNotice: String) {
+fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: NfcUiState, activity: Activity, sessionNotice: String,
+    unsaved: UnsavedCue, onSave: () -> Unit) {
     radioControlItem(state.reading) {
         var confirmNdef by rememberSaveable { mutableStateOf(false) }
         RadioControlCard(
@@ -37,6 +38,7 @@ fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: Nf
             startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
             counts = "${state.tags.size} tags this session",
             notice = sessionNotice,
+            unsaved = unsaved, onSave = onSave,
             summary = { Text("Hardware: ${radio.availability.label} · ${radio.state.label}", style = MaterialTheme.typography.titleMedium) }
         ) {
             if (state.reading) Button(onClick = { vm.stop() }) { Text("Stop NFC reader") }

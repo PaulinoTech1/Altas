@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -60,12 +61,19 @@ fun AtlasSessionBanner(active: Boolean, message: String) {
 }
 
 @Composable
-fun AtlasNavigation(page: String, navigate: (String) -> Unit) {
+fun AtlasNavigation(page: String, historyBadge: Boolean = false, navigate: (String) -> Unit) {
     NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceVariant) {
         AtlasSection.entries.forEach { section ->
             val selected = page == section.page || (section == AtlasSection.OVERVIEW && AtlasSection.entries.none { it.page == page })
             NavigationBarItem(selected = selected, onClick = { navigate(section.page) },
-                icon = { NavigationGlyph(section, if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant) },
+                icon = {
+                    // B3: a dot on History while temporary measurements are newer than the last save. Tag unchanged.
+                    BadgedBox(badge = {
+                        if (section == AtlasSection.HISTORY && historyBadge) Badge(Modifier.semantics { contentDescription = "Unsaved measurements" })
+                    }) {
+                        NavigationGlyph(section, if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
                 label = { Text(section.label, maxLines = 1) },
                 modifier = Modifier.testTag("nav-${section.page.lowercase()}"))
         }

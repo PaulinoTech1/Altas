@@ -25,6 +25,7 @@ import java.util.Date
 fun LazyListScope.cellularContent(
     radio: RadioCapability, viewModel: CellularViewModel, state: CellularUiState,
     missingPermissions: List<String>, nowElapsedMillis: Long, sessionNotice: String,
+    unsaved: UnsavedCue, onSave: () -> Unit,
     requestPermissions: () -> Unit, openSettings: () -> Unit
 ) {
     val permissionsGranted = missingPermissions.isEmpty()
@@ -34,6 +35,7 @@ fun LazyListScope.cellularContent(
             startedAtMillis = state.sessionStartedAtMillis, limitMillis = state.sessionLimitMillis,
             counts = "${state.cells?.rows?.size ?: 0} cells · ${state.eventCount} reports",
             notice = sessionNotice,
+            unsaved = unsaved, onSave = onSave,
             summary = { Text("Hardware: ${radio.availability.label}", style = MaterialTheme.typography.titleMedium) }
         ) {
             if (state.collecting) {
