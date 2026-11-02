@@ -1,0 +1,42 @@
+name: Android BLE validation
+
+on:
+  push:
+    branches:
+      - feature/ble-pixel-origin-isolation
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-ble.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --channel=3 "platforms;android-37.0" "build-tools;36.0.0"
+      - name: Build and test Android app
+        working-directory: android
+        run: bash ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --no-configuration-cache
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-ble-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-ble-ui-test-apk
+          path: android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error

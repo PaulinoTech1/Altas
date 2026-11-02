@@ -87,6 +87,34 @@ class BluetoothTest {
         assertNull(event().ageMillis(1))
     }
 
+    @Test fun gpsFixMatchesOnlyFreshPriorPixelPosition() {
+        val fix = PhoneGpsFix(42.0, -71.0, 8f, 10_000_000_000L)
+        assertTrue(fix.matches(10_000_000_000L))
+        assertTrue(fix.matches(20_000_000_000L))
+        assertFalse(fix.matches(20_000_000_001L))
+        assertFalse(fix.matches(9_999_999_999L))
+        assertFalse(fix.copy(horizontalAccuracyMeters = Float.NaN).matches(11_000_000_000L))
+        assertFalse(fix.copy(latitude = 91.0).matches(11_000_000_000L))
+    }
+
+    @Test fun selectedSignatureIsolationClearsWithSelectionAndHistory() {
+        val vm = BluetoothViewModel(object : BleScanner {
+            override fun scan(config: BleScanConfig) = flow<BleObservation> { }
+        }, FakeGatt())
+        vm.setIsolation(true)
+        assertFalse(vm.state.value.isolateSelected)
+        vm.select("AA")
+        vm.setIsolation(true)
+        assertTrue(vm.state.value.isolateSelected)
+        vm.select(null)
+        assertFalse(vm.state.value.isolateSelected)
+        vm.select("AA")
+        vm.setIsolation(true)
+        vm.clearHistory()
+        assertNull(vm.state.value.selectedAddress)
+        assertFalse(vm.state.value.isolateSelected)
+    }
+
     @Test fun surveyPolicyIncludesLocationWithoutAdvertisingOrBackgroundAccess() {
         assertEquals(setOf("android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT",
             "android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"),

@@ -33,6 +33,7 @@ import com.example.atlas.acquisition.bluetooth.BleObservation
 import com.example.atlas.ui.TimeFormats
 import kotlin.math.PI
 import kotlin.math.roundToInt
+import java.util.Locale
 
 private data class AxisGuide(val name: String, val x: Float, val y: Float, val z: Float, val color: Color)
 
@@ -40,7 +41,7 @@ private data class AxisGuide(val name: String, val x: Float, val y: Float, val z
 @Composable
 fun BleOrientationGlobe(
     history: List<BleObservation>, scanning: Boolean, selectedAddress: String?, startedAtMillis: Long?,
-    onSelectAddress: (String?) -> Unit
+    isolateSelected: Boolean = false, onIsolationChange: (Boolean) -> Unit = {}, onSelectAddress: (String?) -> Unit
 ) {
     val current = remember(history, scanning, startedAtMillis) {
         if (scanning && startedAtMillis != null) history.filter { it.observedAtMillis >= startedAtMillis } else history
@@ -55,11 +56,21 @@ fun BleOrientationGlobe(
     var pitch by remember(session) { mutableFloatStateOf(-0.35f) }
     var zoom by remember(session) { mutableFloatStateOf(1f) }
     var selectedEventId by remember(session) { mutableStateOf<String?>(null) }
-    val projected = remember(samples, yaw, pitch, zoom) {
-        samples.mapNotNull { OrientationGlobeMath.project(it, yaw, pitch, zoom) }
+    var isolatedEventId by remember(session) { mutableStateOf<String?>(null) }
+    val focusedEventId = isolatedEventId?.takeIf { id ->
+        samples.any { it.eventId == id && it.address == selectedAddress }
+    }
+    val visibleSamples = remember(samples, selectedAddress, isolateSelected, focusedEventId) {
+        if (!isolateSelected || selectedAddress == null) samples
+        else samples.filter {
+            it.address == selectedAddress && (focusedEventId == null || it.eventId == focusedEventId)
+        }
+    }
+    val projected = remember(visibleSamples, yaw, pitch, zoom) {
+        visibleSamples.mapNotNull { OrientationGlobeMath.project(it, yaw, pitch, zoom) }
     }
     val activeAddress = selectedAddress?.takeIf { address -> samples.any { it.address == address } }
-    val candidates = if (activeAddress == null) samples else samples.filter { it.address == activeAddress }
+    val candidates = if (selectedAddress == null) samples else samples.filter { it.address == selectedAddress }
     val chosen = candidates.firstOrNull { it.eventId == selectedEventId } ?: candidates.firstOrNull()
     val chosenIndex = candidates.indexOfFirst { it.eventId == chosen?.eventId }
     val colors = MaterialTheme.colorScheme
@@ -75,11 +86,11 @@ fun BleOrientationGlobe(
         axes.associate { it.name to textMeasurer.measure("+${it.name} -100", tickStyle.copy(color = it.color)) }
     }
 
-    ChartCard("3D orientation signature") {
+    ChartCard("Pixel-centered 3D orientation signature") {
         Canvas(Modifier.fillMaxWidth().aspectRatio(1f)
             .testTag("ble-orientation-globe")
             .semantics {
-                contentDescription = "3D phone orientation signature, ${samples.size} paired BLE samples. " +
+                contentDescription = "Pixel origin at center; 3D phone orientation signature, ${visibleSamples.size} visible paired BLE samples. " +
                     "Phone X, Y, Z axes have shared signal-strength ticks at -50, -70, -90, and -100 dBm. " +
                     "Not physical distance. Drag to orbit, pinch to zoom, tap a point to inspect."
                 stateDescription = "View yaw ${(yaw * 180f / PI.toFloat()).roundToInt()} degrees, " +
@@ -93,7 +104,9 @@ fun BleOrientationGlobe(
                     val y = (tap.y - size.height / 2f) / radius
                     OrientationGlobeMath.hit(x, y, projected, 28.dp.toPx() / radius)?.event?.let {
                         selectedEventId = it.eventId
+                        isolatedEventId = it.eventId
                         onSelectAddress(it.address)
+                        onIsolationChange(true)
                     }
                 }
             }
@@ -134,6 +147,8 @@ fun BleOrientationGlobe(
                 drawText(end, topLeft = Offset((positive.x + 4f).coerceIn(0f, (size.width - end.size.width).coerceAtLeast(0f)),
                     labelY.coerceIn(0f, (size.height - end.size.height).coerceAtLeast(0f))))
             }
+            drawCircle(colors.primary, 6f, center)
+            drawCircle(colors.onSurface, 9f, center, style = Stroke(2f))
             for (point in projected.sortedBy { it.depth }) {
                 val event = point.event
                 val position = Offset(center.x + point.x * radius, center.y + point.y * radius)
@@ -146,33 +161,58 @@ fun BleOrientationGlobe(
                 if (event.eventId == chosen?.eventId) drawCircle(colors.onSurface, dotRadius + 5f, position, style = Stroke(2f))
             }
         }
-        Text("Drag to orbit · pinch to zoom · tap a point. Touch targets extend beyond visible dots.",
+        Text("Drag to orbit · pinch to zoom · tap a point to isolate that observation. Touch targets extend beyond visible dots.",
             style = MaterialTheme.typography.bodySmall)
-        Text("X, Y, Z are phone-orientation axes. Each colored axis has ticks at -50, -70, -90, -100 dBm; numbers on X label the shared scale. Stronger signal is toward center. Axes and shells are not device coordinates or range.",
+        Text("The Pixel is the reference origin. X, Y, Z are phone-orientation axes. Each colored axis has ticks at -50, -70, -90, -100 dBm; numbers on X label the shared scale. Stronger signal is toward center. Axes and shells are not device coordinates or range.",
             style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         if (selectedAddress != null && activeAddress == null && samples.isNotEmpty()) {
-            Text("The selected address has no paired sample in this scan; showing all observed addresses.",
+            Text(if (isolateSelected) "The isolated address has no paired orientation sample in this scan."
+                else "The selected address has no paired sample in this scan; showing all observed addresses.",
                 style = MaterialTheme.typography.bodySmall)
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { selectedEventId = candidates[chosenIndex + 1].eventId },
-                enabled = chosenIndex >= 0 && chosenIndex < candidates.lastIndex) { Text("Older point") }
-            OutlinedButton(onClick = { selectedEventId = candidates[chosenIndex - 1].eventId },
-                enabled = chosenIndex > 0) { Text("Newer point") }
+            OutlinedButton(onClick = {
+                val eventId = candidates[chosenIndex + 1].eventId
+                selectedEventId = eventId
+                if (focusedEventId != null) isolatedEventId = eventId
+            }, enabled = chosenIndex >= 0 && chosenIndex < candidates.lastIndex) { Text("Older point") }
+            OutlinedButton(onClick = {
+                val eventId = candidates[chosenIndex - 1].eventId
+                selectedEventId = eventId
+                if (focusedEventId != null) isolatedEventId = eventId
+            }, enabled = chosenIndex > 0) { Text("Newer point") }
             OutlinedButton(onClick = { yaw = 0.55f; pitch = -0.35f; zoom = 1f }) { Text("Reset view") }
-            if (selectedAddress != null) OutlinedButton(onClick = { selectedEventId = null; onSelectAddress(null) }) {
-                Text("Show all devices")
+            if (focusedEventId != null && isolateSelected && activeAddress != null)
+                OutlinedButton(onClick = { isolatedEventId = null }) { Text("Show other points from this device") }
+            if (selectedAddress != null) OutlinedButton(onClick = {
+                isolatedEventId = null
+                onIsolationChange(!isolateSelected)
+            }) {
+                Text(if (isolateSelected) "Show other signatures" else "Isolate selected signature")
             }
+            if (selectedAddress != null) OutlinedButton(onClick = {
+                selectedEventId = null
+                isolatedEventId = null
+                onSelectAddress(null)
+            }) { Text("Show all devices") }
         }
         if (chosen != null) {
             Text("Selected point ${chosenIndex + 1}/${candidates.size}: ${chosen.rssiDbm} dBm · " +
                 "${chosen.advertisement.name?.takeIf { it.isNotBlank() } ?: chosen.address} · ${TimeFormats.dateTime(chosen.observedAtMillis)}",
                 style = MaterialTheme.typography.bodyMedium)
+            Text("Device name: ${chosen.advertisement.name?.takeIf { it.isNotBlank() } ?: "Not advertised"}",
+                style = MaterialTheme.typography.bodyMedium)
+            Text("Observed address: ${chosen.address}", style = MaterialTheme.typography.bodySmall)
+            val fix = chosen.phoneGpsFix
+            Text(if (fix == null) "Pixel GPS fix unavailable for this observation."
+                else String.format(Locale.ROOT, "Pixel GPS %.5f, %.5f ±%.0f m (horizontal)",
+                    fix.latitude, fix.longitude, fix.horizontalAccuracyMeters),
+                style = MaterialTheme.typography.bodySmall)
         } else {
             Text("No paired orientation samples yet. Rotate the phone during an explicit BLE scan; a nearby advertiser is also required.",
                 style = MaterialTheme.typography.bodySmall)
         }
-        Text("${samples.size} paired samples from the latest scan · ${if (scanning) "collecting" else "idle"}. " +
+        Text("${visibleSamples.size} visible paired samples from the latest scan · ${if (scanning) "collecting" else "idle"}. " +
             "Addresses can rotate. Neither this model nor RSSI measures device bearing or physical location.",
             style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
     }

@@ -11,11 +11,14 @@ import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Looper
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.example.atlas.permissions.RadioPermissionManager
@@ -44,6 +47,15 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
         val scanSessionId = UUID.randomUUID().toString()
         val sensors = app.getSystemService(SensorManager::class.java)
         val orientationSensor = sensors?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
+        val locations = app.getSystemService(LocationManager::class.java)
+        val latestGps = AtomicReference<PhoneGpsFix?>()
+        val gpsListener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                if (location.provider != LocationManager.GPS_PROVIDER || !location.hasAccuracy()) return
+                latestGps.set(PhoneGpsFix(location.latitude, location.longitude,
+                    location.accuracy, location.elapsedRealtimeNanos))
+            }
+        }
         // Sensor events and BLE callbacks may arrive on different threads. A single immutable snapshot is enough.
         val latestOrientation = AtomicReference<PhoneOrientation?>()
         val orientationListener = object : SensorEventListener {
@@ -78,7 +90,8 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
                         AdvertisementParser.parse(result.scanRecord?.bytes,
                             result.dataStatus == ScanResult.DATA_TRUNCATED),
                         phoneOrientation = orientation,
-                        orientationSessionId = scanSessionId
+                        orientationSessionId = scanSessionId,
+                        phoneGpsFix = latestGps.get()?.takeIf { it.matches(observationTime) }
                     )
                     trySend(event)
                 } catch (_: SecurityException) {
@@ -103,9 +116,22 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
             }
         }
         var registered = false
+        var gpsRegistered = false
         lastStartElapsedMillis = now
         try {
             if (orientationSensor != null) sensors.registerListener(orientationListener, orientationSensor, SensorManager.SENSOR_DELAY_UI)
+            try {
+                if (locations?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
+                    locations.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let(gpsListener::onLocationChanged)
+                    locations.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f,
+                        gpsListener, Looper.getMainLooper())
+                    gpsRegistered = true
+                }
+            } catch (_: IllegalArgumentException) {
+                // A missing GPS provider must not prevent BLE scanning.
+            } catch (_: SecurityException) {
+                // A GPS-specific denial must not prevent the existing BLE scan.
+            }
             // Bluetooth broadcasts may originate from a separate privileged UID.
             ContextCompat.registerReceiver(app, receiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED).apply {
                 addAction(LocationManager.MODE_CHANGED_ACTION)
@@ -114,6 +140,7 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
             scanner.startScan(null, settings, callback)
         } catch (failure: Exception) {
             sensors?.unregisterListener(orientationListener)
+            if (gpsRegistered) try { locations?.removeUpdates(gpsListener) } catch (_: SecurityException) { }
             if (registered) app.unregisterReceiver(receiver)
             // A partially registered scanner still needs cleanup before propagating failure.
             try { scanner.stopScan(callback) } catch (_: SecurityException) { /* OS revocation owns cleanup. */ }
@@ -122,6 +149,7 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
         }
         awaitClose {
             sensors?.unregisterListener(orientationListener)
+            if (gpsRegistered) try { locations?.removeUpdates(gpsListener) } catch (_: SecurityException) { }
             if (registered) app.unregisterReceiver(receiver)
             try { scanner.stopScan(callback) } catch (_: SecurityException) { /* OS revocation prevents app cleanup. */ }
             catch (_: IllegalStateException) { /* Bluetooth was disabled; no active radio scan remains. */ }

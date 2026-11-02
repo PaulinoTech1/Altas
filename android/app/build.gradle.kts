@@ -23,6 +23,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep CI and local debug builds separate from an existing Atlas installation.
+            applicationIdSuffix = ".blepreview"
+            versionNameSuffix = "-blepreview"
+        }
         release {
             optimization {
                 enable = true
