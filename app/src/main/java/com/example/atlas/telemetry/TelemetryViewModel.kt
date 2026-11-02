@@ -55,6 +55,13 @@ class TelemetryViewModel(private val repository: TelemetryRepository) : ViewMode
         operation("Export failed before writing; the chosen document was not written") { "Exported ${repository.export(uri, redact)} records (${if (redact) "identifiers redacted" else "includes identifiers"})." }
     }
     fun exportUnavailable() { mutable.update { it.copy(error = "No document picker is available. Export was not started.") } }
+    /** B5: preview for the retention confirmation dialog; null if storage could not be read. Deletes nothing. */
+    suspend fun previewRemoval(value: StoragePreferences): Int? = try { repository.previewRemoval(value) }
+        catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { null }
+    fun setRedactExportDefault(redact: Boolean) = operation("Export default update failed") {
+        repository.setRedactExport(redact)
+        if (redact) "Exports are redacted by default." else "Exports include identifiers by default."
+    }
     fun refresh() = operation("Retention check failed") { "${UiText.retentionResult(repository.maintain())}." }
     private fun operation(failurePrefix: String, action: suspend () -> String) {
         if (mutable.value.busy || !mutable.value.loaded) return

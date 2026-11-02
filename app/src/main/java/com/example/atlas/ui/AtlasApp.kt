@@ -197,13 +197,15 @@ fun AtlasApp(
                         TextButton(onClick = onAppSettings) { Text("App permission settings") }
                     }
                 }
-                page == "History" -> telemetryHistory(storage, savedHistory, telemetry, UnsavedData.summary(unsavedCounts), saveAll)
+                page == "History" -> telemetryHistory(storage, savedHistory, telemetry, UnsavedData.summary(unsavedCounts), saveAll,
+                    openOverview = { page = "Dashboard" }, openExport = { page = "Settings" })
                 page == "Settings" -> {
-                    storageSettings(storage, telemetry, onExport)
-                    item {
+                    storageSettings(storage, telemetry, onExport, onAppSettings)
+                    // B5: About this device, expandable. App permission settings now has its own Permissions section.
+                    item(key = "settings-about") {
                         var showDetails by rememberSaveable { mutableStateOf(false) }
                         ItemColumn {
-                            TextButton(onClick = { showDetails = !showDetails }) { Text("Device & collection details") }
+                            TextButton(onClick = { showDetails = !showDetails }) { Text(if (showDetails) "Hide device details" else "About this device") }
                             if (showDetails) {
                                 Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
                                 Text("Minimum API 31 · Target API 37 · Development preview")
@@ -212,7 +214,6 @@ fun AtlasApp(
                                 Explanation("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
                                 Explanation("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")
                                 Explanation("NFC reader mode uses explicit 60-second foreground sessions. Up to 32 tag reports and 20 APDU exchanges remain in memory; APDU payloads are never saved to telemetry.")
-                                TextButton(onClick = onAppSettings) { Text("App permission settings") }
                             }
                         }
                     }

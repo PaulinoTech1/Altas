@@ -42,6 +42,18 @@ class TelemetryRepository internal constructor(context: Context) {
 
     suspend fun maintain(): Int = mutex.withLock { database.withTransaction { prune(preferences.values.first()) } }
 
+    /** B5: how many saved records applying [value] would remove now. Read-only; nothing is deleted. */
+    suspend fun previewRemoval(value: StoragePreferences): Int = mutex.withLock {
+        val total = dao.totalCount()
+        val expired = dao.countOlderThan(RetentionMath.cutoffMillis(System.currentTimeMillis(), value.retentionDays))
+        RetentionMath.removalCount(total, expired, value.maximumRows)
+    }
+
+    /** B5: persists only the export-redaction default; retention limits are untouched and nothing is pruned. */
+    suspend fun setRedactExport(redact: Boolean) = mutex.withLock {
+        preferences.set(preferences.values.first().copy(redactExport = redact))
+    }
+
     suspend fun configure(value: StoragePreferences): Int = mutex.withLock {
         preferences.set(value)
         database.withTransaction { prune(value) }

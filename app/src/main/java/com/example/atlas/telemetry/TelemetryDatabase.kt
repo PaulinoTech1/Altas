@@ -41,6 +41,8 @@ interface MeasurementDao {
     @Query("SELECT * FROM measurements ORDER BY eventTimestampMillis DESC, eventId DESC LIMIT 50000")
     suspend fun exportRows(): List<Measurement>
     @Query("DELETE FROM measurements WHERE eventTimestampMillis < :cutoff") suspend fun expire(cutoff: Long)
+    /** B5 retention preview: read-only count of what [expire] would delete. */
+    @Query("SELECT COUNT(*) FROM measurements WHERE eventTimestampMillis < :cutoff") suspend fun countOlderThan(cutoff: Long): Int
     @Query("DELETE FROM measurements WHERE dedupeKey NOT IN (SELECT dedupeKey FROM measurements ORDER BY eventTimestampMillis DESC, eventId DESC LIMIT :limit)")
     suspend fun cap(limit: Int)
 }
