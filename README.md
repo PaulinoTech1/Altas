@@ -1,5 +1,10 @@
 # Atlas · local network observatory
 
+The native Android Atlas RF project is in [android/](android/). It is a separate
+application with its own build instructions and validation notes. The Android
+source snapshot follows the local Android Studio working tree; local build logs,
+IDE settings, and physical telemetry evidence are not included in this branch.
+
 Atlas runs on an unrooted Android phone through Termux and Debian PRoot. It observes reachable TCP services, stores evidence in SQLite, and explores imported BLE captures. The dashboard and interactive network map are served at **http://127.0.0.1:8765**.
 
 ## Run

@@ -1,0 +1,141 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "5d7d5f20f6377d89b6b2c1181e89016e",
+    "entities": [
+      {
+        "tableName": "measurements",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`dedupeKey` TEXT NOT NULL, `eventId` TEXT NOT NULL, `radioType` TEXT NOT NULL, `eventTimestampMillis` INTEGER NOT NULL, `sourceTimestampMillis` INTEGER, `sourceTimeBasis` TEXT NOT NULL, `receivedElapsedMillis` INTEGER, `bootId` TEXT, `interfaceId` TEXT, `measurementType` TEXT NOT NULL, `value` REAL, `units` TEXT, `collectionStatus` TEXT NOT NULL, `permissionState` TEXT NOT NULL, `sourceApi` TEXT NOT NULL, `freshness` TEXT NOT NULL, `metadataJson` TEXT NOT NULL, PRIMARY KEY(`dedupeKey`))",
+        "fields": [
+          {
+            "fieldPath": "dedupeKey",
+            "columnName": "dedupeKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventId",
+            "columnName": "eventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "radioType",
+            "columnName": "radioType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventTimestampMillis",
+            "columnName": "eventTimestampMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceTimestampMillis",
+            "columnName": "sourceTimestampMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sourceTimeBasis",
+            "columnName": "sourceTimeBasis",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedElapsedMillis",
+            "columnName": "receivedElapsedMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "bootId",
+            "columnName": "bootId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "interfaceId",
+            "columnName": "interfaceId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "measurementType",
+            "columnName": "measurementType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "units",
+            "columnName": "units",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "collectionStatus",
+            "columnName": "collectionStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "permissionState",
+            "columnName": "permissionState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceApi",
+            "columnName": "sourceApi",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "freshness",
+            "columnName": "freshness",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metadataJson",
+            "columnName": "metadataJson",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "dedupeKey"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_measurements_eventTimestampMillis",
+            "unique": false,
+            "columnNames": [
+              "eventTimestampMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_measurements_eventTimestampMillis` ON `${TABLE_NAME}` (`eventTimestampMillis`)"
+          },
+          {
+            "name": "index_measurements_radioType",
+            "unique": false,
+            "columnNames": [
+              "radioType"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_measurements_radioType` ON `${TABLE_NAME}` (`radioType`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5d7d5f20f6377d89b6b2c1181e89016e')"
+    ]
+  }
+}

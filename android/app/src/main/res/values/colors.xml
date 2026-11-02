@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window background shown before Compose draws; matches the Compose surface (AtlasPaper / AtlasNight). -->
+    <color name="atlas_window_background">#FFF4F8F7</color>
+</resources>
