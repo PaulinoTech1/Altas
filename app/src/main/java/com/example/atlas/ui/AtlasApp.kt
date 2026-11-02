@@ -5,6 +5,11 @@ import android.os.SystemClock
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -219,78 +223,44 @@ fun AtlasApp(
                     }
                 }
                 else -> {
-                    item { Pairs {
-                        SectionTitle("Choose a radio")
-                        Explanation("Review permissions, start a session, then stop. Open History to save your measurements.")
-                        Text(when {
-                            storage.error != null -> "Saved history unavailable. Open History for details."
-                            !storage.loaded -> "Opening saved history…"
-                            else -> "${storage.count} records saved on this device"
-                        }, style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary)
-                    } }
-                    items(state.radios.sortedBy { it.type == RadioType.NFC }, key = { it.type }) { radio ->
-                        Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
-                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                    Text(radio.type.title, style = MaterialTheme.typography.titleMedium)
-                                    TextButton(onClick = { page = radio.type.name }) { Text("Open ${radio.type.title}") }
-                                }
-                                // One TalkBack stop for the status lines; "Open X" stays its own button and is not part of this merge.
-                                Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    val accessReady = when (radio.type) {
-                                        RadioType.BLUETOOTH -> blePermissionsMissing.isEmpty()
-                                        RadioType.WIFI -> wifiPermissionsMissing.isEmpty()
-                                        RadioType.CELLULAR -> cellularPermissionsMissing.isEmpty()
-                                        RadioType.NFC -> true
-                                    }
-                                    val ready = radio.availability == Availability.AVAILABLE && accessReady &&
-                                        radio.state !in setOf(RadioState.DISABLED, RadioState.ERROR, RadioState.PERMISSION_REQUIRED)
-                                    Text(when {
-                                        radio.availability == Availability.UNKNOWN -> "Hardware not checked"
-                                        radio.availability == Availability.UNAVAILABLE -> "Hardware unavailable"
-                                        radio.state == RadioState.DISABLED -> "Turn on radio to collect"
-                                        ready -> "Ready to collect"
-                                        else -> "Permission needed"
-                                    }, style = MaterialTheme.typography.labelLarge,
-                                        color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                                    // NOT_QUERIED is expected on the Overview (e.g. Cellular reads state only on its own screen).
-                                    val stateLabel = if (radio.state == RadioState.NOT_QUERIED)
-                                        "${radio.type.title} state is read when you open ${radio.type.title}" else radio.state.label
-                                    Text("Hardware: ${radio.availability.label} · $stateLabel", style = MaterialTheme.typography.bodySmall)
-                                    val permissionLabel = when (radio.type) {
-                                        RadioType.BLUETOOTH -> if (blePermissionsMissing.isEmpty()) "Survey access granted" else "Survey permissions needed"
-                                        RadioType.WIFI -> if (wifiPermissionsMissing.isEmpty()) "Survey access granted" else "Precise location needed"
-                                        RadioType.CELLULAR -> if (cellularPermissionsMissing.isEmpty()) "Diagnostic access granted" else "Phone status / location needed"
-                                        else -> radio.permission.label
-                                    }
-                                    Text("Permission: $permissionLabel", style = MaterialTheme.typography.bodySmall)
-                                    val collectionLabel = when (radio.type) {
-                                        RadioType.BLUETOOTH -> if (ble.scanning) "Scanning" else "Idle"
-                                        RadioType.WIFI -> if (wifi.collecting) "Surveying" else "Idle"
-                                        RadioType.CELLULAR -> if (cell.collecting) "Collecting" else "Idle"
-                                        RadioType.NFC -> if (nfcState.reading) "Reading" else "Idle"
-                                    }
-                                    val lastMeasurement = when (radio.type) {
-                                        RadioType.BLUETOOTH -> ble.history.firstOrNull()?.observedAtMillis
-                                        RadioType.WIFI -> (wifi.rows.map { it.observedAtMillis } + wifi.connections.map { it.observedAtMillis }).maxOrNull()
-                                        RadioType.CELLULAR -> listOfNotNull(cell.cells?.receivedAtMillis, cell.signal?.receivedAtMillis).maxOrNull()
-                                        RadioType.NFC -> nfcState.tags.firstOrNull()?.observedAtMillis
-                                    }
-                                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                                    // Neutral when idle; primary with a dot while collecting. The state stays in words.
-                                    val collecting = collectionLabel != "Idle"
-                                    val collectionColor = if (collecting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                        if (collecting) Canvas(Modifier.size(8.dp)) { drawCircle(collectionColor) }
-                                        Text("Collection: $collectionLabel", style = MaterialTheme.typography.labelLarge, color = collectionColor)
-                                    }
-                                    LastMeasurementLine(lastMeasurement)
-                                }
-                                radio.error?.let { DiagnosticNotice("STATE", it) }
+                    // B7: one-line intro; the saved count is a link to History.
+                    item(key = "overview-intro") {
+                        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                            itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            SectionTitle("Choose a radio")
+                            when {
+                                storage.error != null -> Text("Saved history unavailable", style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error)
+                                !storage.loaded -> Text("Opening saved history…", style = MaterialTheme.typography.labelLarge)
+                                else -> TextButton(onClick = { page = "History" }) { Text(UiText.records(storage.count) + " saved") }
                             }
                         }
+                    }
+                    items(state.radios.sortedBy { it.type == RadioType.NFC }, key = { it.type }) { radio ->
+                        val accessReady = when (radio.type) {
+                            RadioType.BLUETOOTH -> blePermissionsMissing.isEmpty()
+                            RadioType.WIFI -> wifiPermissionsMissing.isEmpty()
+                            RadioType.CELLULAR -> cellularPermissionsMissing.isEmpty()
+                            RadioType.NFC -> true
+                        }
+                        val collecting = when (radio.type) {
+                            RadioType.BLUETOOTH -> ble.scanning
+                            RadioType.WIFI -> wifi.collecting
+                            RadioType.CELLULAR -> cell.collecting
+                            RadioType.NFC -> nfcState.reading
+                        }
+                        val lastMeasurement = when (radio.type) {
+                            RadioType.BLUETOOTH -> ble.history.firstOrNull()?.observedAtMillis
+                            RadioType.WIFI -> (wifi.rows.map { it.observedAtMillis } + wifi.connections.map { it.observedAtMillis }).maxOrNull()
+                            RadioType.CELLULAR -> listOfNotNull(cell.cells?.receivedAtMillis, cell.signal?.receivedAtMillis).maxOrNull()
+                            RadioType.NFC -> nfcState.tags.firstOrNull()?.observedAtMillis
+                        }
+                        OverviewCard(
+                            radio = radio,
+                            status = RadioStatus.of(radio.availability, radio.state, accessReady, collecting),
+                            summary = RadioStatus.summaryLine(radio.availability, radio.state, lastMeasurement?.let(::shortTime)),
+                            open = { page = radio.type.name }
+                        )
                     }
                     item {
                         OutlinedButton(onClick = viewModel::refresh, enabled = !state.refreshing) { Text("Refresh capabilities") }
@@ -323,22 +293,56 @@ private fun RadioDetails(radio: RadioCapability) {
 }
 
 /** "Last measurement: 6:51 PM (3 min ago)"; the relative part refreshes every 30 s without recomposing the page. */
+/** Time of day for today, short date and time otherwise. */
+private fun shortTime(epochMillis: Long): String =
+    (if (DateUtils.isToday(epochMillis)) DateFormat.getTimeInstance(DateFormat.SHORT)
+    else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)).format(Date(epochMillis))
+
+/**
+ * B7: compact Overview card. The whole card opens the radio (click label "Open X"); "Open X" also stays a visible,
+ * separate TextButton, which is its own click/merge boundary, so DIT's onNodeWithText("Open X") still finds one node.
+ */
 @Composable
-private fun LastMeasurementLine(epochMillis: Long?) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val now by produceState(System.currentTimeMillis(), epochMillis, lifecycleOwner) {
-        if (epochMillis != null) lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                value = System.currentTimeMillis()
-                delay(30_000) // Label refresh only; never polls hardware.
+private fun OverviewCard(radio: RadioCapability, status: RadioStatus, summary: String, open: () -> Unit) {
+    val shape = MaterialTheme.shapes.medium
+    Surface(
+        Modifier.fillMaxWidth().clip(shape).clickable(onClickLabel = "Open ${radio.type.title}", onClick = open),
+        shape = shape, tonalElevation = 1.dp
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                itemVerticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text(radio.type.title, style = MaterialTheme.typography.titleMedium)
+                    StatusChip(status)
+                }
+                TextButton(onClick = open) { Text("Open ${radio.type.title}") }
             }
+            Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            radio.error?.let { DiagnosticNotice("STATE", it) }
         }
     }
-    val formatted = epochMillis?.let {
-        val sameDay = DateUtils.isToday(it)
-        (if (sameDay) DateFormat.getTimeInstance(DateFormat.SHORT) else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)).format(Date(it))
+}
+
+@Composable
+private fun StatusChip(status: RadioStatus) {
+    val (container, content) = when (status.tone) {
+        RadioStatus.Tone.GOOD -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        RadioStatus.Tone.ATTENTION -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        RadioStatus.Tone.NEUTRAL -> MaterialTheme.colorScheme.surfaceContainerHighest to MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Text(UiText.lastMeasurement(epochMillis, now, formatted), style = MaterialTheme.typography.bodySmall)
+    Surface(color = container, contentColor = content, shape = MaterialTheme.shapes.small) {
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            when {
+                status == RadioStatus.COLLECTING -> Canvas(Modifier.size(8.dp)) { drawCircle(content) }
+                status.tone == RadioStatus.Tone.GOOD -> Icon(AtlasIcons.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                status.tone == RadioStatus.Tone.ATTENTION -> Icon(AtlasIcons.Warning, contentDescription = null, modifier = Modifier.size(14.dp))
+                else -> Unit
+            }
+            Text(status.label, style = MaterialTheme.typography.labelMedium)
+        }
+    }
 }
 
 private fun timeLabel(epochMillis: Long?): String = epochMillis?.let {
