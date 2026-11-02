@@ -1,6 +1,7 @@
 package com.example.atlas.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -8,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.atlas.telemetry.*
@@ -19,7 +21,7 @@ fun LazyListScope.storageStatus(state: TelemetryUiState) {
         ItemColumn {
             Text("Saved records: ${state.count}", style = MaterialTheme.typography.titleMedium)
             if (!state.loaded && state.error == null) Explanation("Opening private telemetry storage…")
-            state.message?.let { Text(it) }
+            state.message?.let { StatusText(it) }
             state.error?.let { DiagnosticNotice("STORAGE", it) }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -80,7 +82,7 @@ private fun HistoryFilter(vm: TelemetryViewModel) {
     OutlinedTextField(value = query, onValueChange = { query = it.take(100) }, label = { Text("Search measurement or status") }, modifier = Modifier.fillMaxWidth())
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf("" to "All radios", "BLUETOOTH" to "Bluetooth", "WIFI" to "Wi-Fi", "CELLULAR" to "Cellular", "NFC" to "NFC").forEach { (value, title) ->
-            FilterChip(selected = radio == value, onClick = { radio = value }, label = { Text(title) })
+            FilterChip(selected = radio == value, leadingIcon = chipCheck(radio == value), onClick = { radio = value }, label = { Text(title) })
         }
     }
 }
@@ -101,10 +103,17 @@ private fun SettingsControls(state: TelemetryUiState, vm: TelemetryViewModel, on
             SectionTitle("Private telemetry storage")
             ExpandableNotice("Saved identifiers stay in the app sandbox; exported copies leave it.",
                 "Saved identifiers stay in the app sandbox. Backup is disabled. Exports are copied to your chosen provider and are no longer governed by app retention.")
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Switch(checked = redact, onCheckedChange = { redact = it }, enabled = !state.busy && state.loaded,
-                    modifier = Modifier.testTag("export-redaction"))
-                Text("Redact identifiers and all metadata in exports")
+            // The whole row is the switch (label first, Switch last) so the label is clickable and TalkBack reads one control.
+            Row(
+                Modifier.fillMaxWidth()
+                    .toggleable(value = redact, enabled = !state.busy && state.loaded, role = Role.Switch, onValueChange = { redact = it })
+                    .testTag("export-redaction")
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text("Redact identifiers and all metadata in exports", Modifier.weight(1f))
+                Switch(checked = redact, onCheckedChange = null, enabled = !state.busy && state.loaded)
             }
             if (!redact) Text("Full exports include observed device/network/cell identifiers, names and advertisement metadata. Share only intentionally.", color = MaterialTheme.colorScheme.error)
             OutlinedButton(onClick = { if (redact) onExport(true) else confirmFullExport = true }, enabled = state.loaded && !state.busy) {
@@ -131,10 +140,10 @@ private fun SettingsControls(state: TelemetryUiState, vm: TelemetryViewModel, on
             SectionTitle("Retention")
             Text("Retention: ${UiText.days(days)}; maximum ${UiText.count(maximum, "measurement record")}")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(1, 7, 30).forEach { value -> FilterChip(selected = days == value, onClick = { days = value }, label = { Text(UiText.days(value)) }) }
+                listOf(1, 7, 30).forEach { value -> FilterChip(selected = days == value, leadingIcon = chipCheck(days == value), onClick = { days = value }, label = { Text(UiText.days(value)) }) }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(1000, 10000, 50000).forEach { value -> FilterChip(selected = maximum == value, onClick = { maximum = value }, label = { Text(UiText.records(value)) }) }
+                listOf(1000, 10000, 50000).forEach { value -> FilterChip(selected = maximum == value, leadingIcon = chipCheck(maximum == value), onClick = { maximum = value }, label = { Text(UiText.records(value)) }) }
             }
             ExpandableNotice("Applying retention permanently removes older and excess saved records.",
                 "Applying retention permanently removes older/excess saved records. Temporary radio histories remain until cleared or the app process ends.")

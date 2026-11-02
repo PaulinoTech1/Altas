@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -246,49 +248,57 @@ fun AtlasApp(
                                     Text(radio.type.title, style = MaterialTheme.typography.titleMedium)
                                     TextButton(onClick = { page = radio.type.name }) { Text("Open ${radio.type.title}") }
                                 }
-                                val accessReady = when (radio.type) {
-                                    RadioType.BLUETOOTH -> blePermissionsMissing.isEmpty()
-                                    RadioType.WIFI -> wifiPermissionsMissing.isEmpty()
-                                    RadioType.CELLULAR -> cellularPermissionsMissing.isEmpty()
-                                    RadioType.NFC -> true
+                                // One TalkBack stop for the status lines; "Open X" stays its own button and is not part of this merge.
+                                Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    val accessReady = when (radio.type) {
+                                        RadioType.BLUETOOTH -> blePermissionsMissing.isEmpty()
+                                        RadioType.WIFI -> wifiPermissionsMissing.isEmpty()
+                                        RadioType.CELLULAR -> cellularPermissionsMissing.isEmpty()
+                                        RadioType.NFC -> true
+                                    }
+                                    val ready = radio.availability == Availability.AVAILABLE && accessReady &&
+                                        radio.state !in setOf(RadioState.DISABLED, RadioState.ERROR, RadioState.PERMISSION_REQUIRED)
+                                    Text(when {
+                                        radio.availability == Availability.UNKNOWN -> "Hardware not checked"
+                                        radio.availability == Availability.UNAVAILABLE -> "Hardware unavailable"
+                                        radio.state == RadioState.DISABLED -> "Turn on radio to collect"
+                                        ready -> "Ready to collect"
+                                        else -> "Permission needed"
+                                    }, style = MaterialTheme.typography.labelLarge,
+                                        color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                                    // NOT_QUERIED is expected on the Overview (e.g. Cellular reads state only on its own screen).
+                                    val stateLabel = if (radio.state == RadioState.NOT_QUERIED)
+                                        "${radio.type.title} state is read when you open ${radio.type.title}" else radio.state.label
+                                    Text("Hardware: ${radio.availability.label} · $stateLabel", style = MaterialTheme.typography.bodySmall)
+                                    val permissionLabel = when (radio.type) {
+                                        RadioType.BLUETOOTH -> if (blePermissionsMissing.isEmpty()) "Survey access granted" else "Survey permissions needed"
+                                        RadioType.WIFI -> if (wifiPermissionsMissing.isEmpty()) "Survey access granted" else "Precise location needed"
+                                        RadioType.CELLULAR -> if (cellularPermissionsMissing.isEmpty()) "Diagnostic access granted" else "Phone status / location needed"
+                                        else -> radio.permission.label
+                                    }
+                                    Text("Permission: $permissionLabel", style = MaterialTheme.typography.bodySmall)
+                                    val collectionLabel = when (radio.type) {
+                                        RadioType.BLUETOOTH -> if (ble.scanning) "Scanning" else "Idle"
+                                        RadioType.WIFI -> if (wifi.collecting) "Surveying" else "Idle"
+                                        RadioType.CELLULAR -> if (cell.collecting) "Collecting" else "Idle"
+                                        RadioType.NFC -> if (nfcState.reading) "Reading" else "Idle"
+                                    }
+                                    val lastMeasurement = when (radio.type) {
+                                        RadioType.BLUETOOTH -> ble.history.firstOrNull()?.observedAtMillis
+                                        RadioType.WIFI -> (wifi.rows.map { it.observedAtMillis } + wifi.connections.map { it.observedAtMillis }).maxOrNull()
+                                        RadioType.CELLULAR -> listOfNotNull(cell.cells?.receivedAtMillis, cell.signal?.receivedAtMillis).maxOrNull()
+                                        RadioType.NFC -> nfcState.tags.firstOrNull()?.observedAtMillis
+                                    }
+                                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                                    // Neutral when idle; primary with a dot while collecting. The state stays in words.
+                                    val collecting = collectionLabel != "Idle"
+                                    val collectionColor = if (collecting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                        if (collecting) Canvas(Modifier.size(8.dp)) { drawCircle(collectionColor) }
+                                        Text("Collection: $collectionLabel", style = MaterialTheme.typography.labelLarge, color = collectionColor)
+                                    }
+                                    LastMeasurementLine(lastMeasurement)
                                 }
-                                val ready = radio.availability == Availability.AVAILABLE && accessReady &&
-                                    radio.state !in setOf(RadioState.DISABLED, RadioState.ERROR, RadioState.PERMISSION_REQUIRED)
-                                Text(when {
-                                    radio.availability == Availability.UNKNOWN -> "Hardware not checked"
-                                    radio.availability == Availability.UNAVAILABLE -> "Hardware unavailable"
-                                    radio.state == RadioState.DISABLED -> "Turn on radio to collect"
-                                    ready -> "Ready to collect"
-                                    else -> "Permission needed"
-                                }, style = MaterialTheme.typography.labelLarge,
-                                    color = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                                // NOT_QUERIED is expected on the Overview (e.g. Cellular reads state only on its own screen).
-                                val stateLabel = if (radio.state == RadioState.NOT_QUERIED)
-                                    "${radio.type.title} state is read when you open ${radio.type.title}" else radio.state.label
-                                Text("Hardware: ${radio.availability.label} · $stateLabel", style = MaterialTheme.typography.bodySmall)
-                                val permissionLabel = when (radio.type) {
-                                    RadioType.BLUETOOTH -> if (blePermissionsMissing.isEmpty()) "Survey access granted" else "Survey permissions needed"
-                                    RadioType.WIFI -> if (wifiPermissionsMissing.isEmpty()) "Survey access granted" else "Precise location needed"
-                                    RadioType.CELLULAR -> if (cellularPermissionsMissing.isEmpty()) "Diagnostic access granted" else "Phone status / location needed"
-                                    else -> radio.permission.label
-                                }
-                                Text("Permission: $permissionLabel", style = MaterialTheme.typography.bodySmall)
-                                val collectionLabel = when (radio.type) {
-                                    RadioType.BLUETOOTH -> if (ble.scanning) "Scanning" else "Idle"
-                                    RadioType.WIFI -> if (wifi.collecting) "Surveying" else "Idle"
-                                    RadioType.CELLULAR -> if (cell.collecting) "Collecting" else "Idle"
-                                    RadioType.NFC -> if (nfcState.reading) "Reading" else "Idle"
-                                }
-                                val lastMeasurement = when (radio.type) {
-                                    RadioType.BLUETOOTH -> ble.history.firstOrNull()?.observedAtMillis
-                                    RadioType.WIFI -> (wifi.rows.map { it.observedAtMillis } + wifi.connections.map { it.observedAtMillis }).maxOrNull()
-                                    RadioType.CELLULAR -> listOfNotNull(cell.cells?.receivedAtMillis, cell.signal?.receivedAtMillis).maxOrNull()
-                                    RadioType.NFC -> nfcState.tags.firstOrNull()?.observedAtMillis
-                                }
-                                HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                                Text("Collection: $collectionLabel", style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary)
-                                LastMeasurementLine(lastMeasurement)
                                 radio.error?.let { DiagnosticNotice("STATE", it) }
                             }
                         }

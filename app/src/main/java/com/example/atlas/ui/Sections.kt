@@ -15,7 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
@@ -66,4 +68,10 @@ fun ExpandableNotice(summary: String, details: String, modifier: Modifier = Modi
         Explanation(if (showFull || expanded) details else summary)
         if (!showFull) TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide details" else "Details") }
     }
+}
+
+/** A collector/storage status line; a polite live region so TalkBack announces changes. */
+@Composable
+fun StatusText(text: String, modifier: Modifier = Modifier) {
+    Text(text, modifier.semantics { liveRegion = LiveRegionMode.Polite })
 }

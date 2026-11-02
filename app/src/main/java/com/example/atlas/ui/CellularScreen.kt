@@ -45,7 +45,7 @@ fun LazyListScope.cellularContent(
             Button(onClick = { viewModel.stop() }) { Text("Stop cellular collection") }
             OutlinedButton(onClick = viewModel::requestUpdate, enabled = state.selectedId != null && state.request?.status != CellRequestStatus.PENDING) { Text("Request cell update") }
         } else Button(onClick = viewModel::start, enabled = missingPermissions.isEmpty()) { Text("Start cellular collection") }
-        Text(state.status)
+        StatusText(state.status)
         state.error?.let { DiagnosticNotice("CELL", it) }
         state.request?.let {
             if (it.status == CellRequestStatus.LOCAL_COOLDOWN || it.status == CellRequestStatus.TIMED_OUT || it.status == CellRequestStatus.MODEM_ERROR)
@@ -61,7 +61,7 @@ fun LazyListScope.cellularContent(
         Text(state.scopeMessage)
         if (state.subscriptions.isEmpty()) Explanation("No active slots loaded. Start with permission to inspect availability.")
         state.subscriptions.forEach { subscription ->
-            FilterChip(selected = state.selectedId == subscription.id, onClick = { viewModel.select(subscription.id) },
+            FilterChip(selected = state.selectedId == subscription.id, leadingIcon = chipCheck(state.selectedId == subscription.id), onClick = { viewModel.select(subscription.id) },
                 label = { Text("${if (subscription.slot >= 0) "Slot ${subscription.slot + 1}" else "Slot unavailable"} · local subscription ${subscription.id}") })
         }
         ExpandableNotice("Selecting a slot stops collection.",

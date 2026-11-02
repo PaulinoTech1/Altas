@@ -2,9 +2,12 @@ package com.example.atlas.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -14,8 +17,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /** App codes describe a failure class. An OS status is included only when Android supplied one. */
@@ -93,7 +98,13 @@ fun DiagnosticNotice(area: String, message: String, modifier: Modifier = Modifie
         shape = MaterialTheme.shapes.medium
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(diagnostic.title, style = MaterialTheme.typography.titleMedium)
+            // Icon + spoken prefix so warning vs error is not conveyed by container color alone.
+            Row(Modifier.semantics(mergeDescendants = true) {}, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (diagnostic.warning) AtlasIcons.Warning else AtlasIcons.Error,
+                    contentDescription = if (diagnostic.warning) "Warning:" else "Error:", modifier = Modifier.size(20.dp))
+                Text(diagnostic.title, style = MaterialTheme.typography.titleMedium)
+            }
             SelectionContainer { Text(diagnostic.code, style = MaterialTheme.typography.labelLarge) }
             Text(diagnostic.nextStep, style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide diagnostic details" else "Diagnostic details") }

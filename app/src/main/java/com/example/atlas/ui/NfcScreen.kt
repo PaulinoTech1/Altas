@@ -44,7 +44,7 @@ fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: Nf
                 text = { Text("NDEF may contain private data. Scanning a security key such as a YubiKey can generate a one-time credential. Use metadata-only mode for security keys; enable NDEF only for a tag whose contents you intend to read.") },
                 confirmButton = { TextButton(onClick = { confirmNdef = false; vm.start(activity, readNdef = true) }) { Text("Start NDEF reader") } },
                 dismissButton = { TextButton(onClick = { confirmNdef = false }) { Text("Cancel") } })
-            Text(state.status)
+            StatusText(state.status)
             state.error?.let { DiagnosticNotice("NFC", it) }
             ExpandableNotice("Reader sessions stop after 60 seconds or when the app leaves the foreground.",
                 "Reader sessions stop after 60 seconds or when the app leaves the foreground. Android does not grant access to protected secure-element credentials.")

@@ -55,7 +55,7 @@ fun LazyListScope.wifiContent(
             Button(onClick = { viewModel.stop() }) { Text("Stop Wi-Fi survey") }
             OutlinedButton(onClick = viewModel::requestScan) { Text("Request Wi-Fi scan") }
         } else Button(onClick = viewModel::start, enabled = missingPermissions.isEmpty()) { Text("Start Wi-Fi survey") }
-        Text(state.status)
+        StatusText(state.status)
         state.request?.let {
             if (it.status == WifiRequestStatus.ACCEPTED) Text(it.message)
             else DiagnosticNotice("WIFI", "${it.status.name}: ${it.message}")

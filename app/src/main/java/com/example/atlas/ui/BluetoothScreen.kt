@@ -64,7 +64,7 @@ fun LazyListScope.bluetoothContent(
         ItemColumn {
             SectionTitle("BLE collection")
             BleControls(state, viewModel, missingPermissions.isEmpty())
-            Text(state.status)
+            StatusText(state.status)
             state.error?.let { DiagnosticNotice("BLE", it) }
             Text("${state.devices.size} retained addresses · ${state.receivedCount} received observations · ${state.history.size}/1024 history entries")
             ExpandableNotice("Scans never restart automatically; a 10-second cooldown applies between scans.",
@@ -125,12 +125,12 @@ private fun BleControls(state: BluetoothUiState, viewModel: BluetoothViewModel, 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(10, 20, 30).forEach { seconds ->
-                FilterChip(selected = state.config.seconds == seconds, enabled = !state.scanning,
+                FilterChip(selected = state.config.seconds == seconds, leadingIcon = chipCheck(state.config.seconds == seconds), enabled = !state.scanning,
                     onClick = { viewModel.configure(state.config.copy(seconds = seconds)) }, label = { Text("${seconds}s") })
             }
         }
         BleScanMode.entries.forEach { mode ->
-            FilterChip(selected = state.config.mode == mode, enabled = !state.scanning,
+            FilterChip(selected = state.config.mode == mode, leadingIcon = chipCheck(state.config.mode == mode), enabled = !state.scanning,
                 onClick = { viewModel.configure(state.config.copy(mode = mode)) }, label = { Text(mode.label) })
         }
         if (state.scanning) Button(onClick = { viewModel.stop() }) { Text("Stop BLE scan") }
