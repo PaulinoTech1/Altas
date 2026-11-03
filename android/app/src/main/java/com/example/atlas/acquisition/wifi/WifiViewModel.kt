@@ -18,6 +18,7 @@ data class WifiUiState(
     val collecting: Boolean = false,
     val status: String = "Idle — no Wi-Fi survey started",
     val rows: List<WifiObservation> = emptyList(),
+    val sort: WifiApSort = WifiApSort.STRONGEST,
     val totalRows: Int = 0,
     val history: List<WifiObservation> = emptyList(),
     val connections: List<WifiConnection> = emptyList(),
@@ -92,6 +93,7 @@ class WifiViewModel(private val repository: WifiSurveyRepository) : ViewModel() 
         mutable.value = mutable.value.copy(collecting = false, status = reason, sessionStartedAtMillis = null)
     }
     fun select(bssid: String?) { mutable.value = mutable.value.copy(selectedBssid = bssid) }
+    fun sortBy(sort: WifiApSort) { mutable.value = mutable.value.copy(sort = sort) }
     fun clear() { if (!mutable.value.collecting) { store.clear(); mutable.value = WifiUiState() } }
     override fun onCleared() { stop() }
 

@@ -50,6 +50,22 @@ data class BleDeviceHistory(
     val receivedCount: Long
 )
 
+enum class BleDeviceSort(val label: String) {
+    RECENT("Recent"), STRONGEST("Strongest RSSI"), MOST_SEEN("Most seen"), NAME("Name");
+
+    fun order(devices: List<BleDeviceHistory>): List<BleDeviceHistory> = when (this) {
+        RECENT -> devices.sortedWith(compareByDescending<BleDeviceHistory> { it.latest.observedAtMillis }
+            .thenBy { it.latest.address })
+        STRONGEST -> devices.sortedWith(compareByDescending<BleDeviceHistory> { it.latest.rssiDbm ?: Int.MIN_VALUE }
+            .thenByDescending { it.latest.observedAtMillis }.thenBy { it.latest.address })
+        MOST_SEEN -> devices.sortedWith(compareByDescending<BleDeviceHistory> { it.receivedCount }
+            .thenByDescending { it.latest.observedAtMillis }.thenBy { it.latest.address })
+        NAME -> devices.sortedWith(compareBy<BleDeviceHistory> {
+            it.latest.advertisement.name?.takeIf(String::isNotBlank)?.lowercase() ?: "\uffff"
+        }.thenBy { it.latest.address })
+    }
+}
+
 /** Identity is the currently observed address, which can rotate. No physical identity inference. */
 class BleHistoryStore(private val deviceLimit: Int = 256, private val eventLimit: Int = 1024) {
     init { require(deviceLimit > 0 && eventLimit > 0) }

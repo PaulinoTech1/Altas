@@ -20,6 +20,7 @@ data class BluetoothUiState(
     val devices: List<BleDeviceHistory> = emptyList(),
     val history: List<BleObservation> = emptyList(),
     val receivedCount: Long = 0,
+    val sort: BleDeviceSort = BleDeviceSort.RECENT,
     val status: String = "Idle — no BLE scan started",
     val error: String? = null,
     val selectedAddress: String? = null,
@@ -37,6 +38,8 @@ class BluetoothViewModel(private val scanner: BleScanner, val gatt: GattClient) 
     fun configure(config: BleScanConfig) {
         if (!mutable.value.scanning) mutable.value = mutable.value.copy(config = config)
     }
+
+    fun sortBy(sort: BleDeviceSort) { mutable.value = mutable.value.copy(sort = sort) }
 
     fun start() {
         if (scanJob?.isCompleted == false) return

@@ -9,6 +9,21 @@ import java.nio.charset.CodingErrorAction
 enum class WifiDelivery { CACHE_READ, UPDATED_BROADCAST, NOT_UPDATED_BROADCAST }
 enum class WifiFreshness(val label: String) { RECENT("Recent platform update"), CACHED("Cached"), STALE("Stale"), UNKNOWN("Source age unavailable") }
 
+enum class WifiApSort(val label: String) {
+    STRONGEST("Strongest"), NEWEST("Newest"), SSID("SSID"), CHANNEL("Channel");
+
+    fun order(rows: List<WifiObservation>): List<WifiObservation> = when (this) {
+        STRONGEST -> rows.sortedWith(compareByDescending<WifiObservation> { it.rssiDbm ?: Int.MIN_VALUE }
+            .thenBy { it.bssid ?: it.eventId })
+        NEWEST -> rows.sortedWith(compareByDescending<WifiObservation> { it.sourceElapsedMicros ?: Long.MIN_VALUE }
+            .thenBy { it.bssid ?: it.eventId })
+        SSID -> rows.sortedWith(compareBy<WifiObservation> { it.ssid == null }
+            .thenBy { it.ssid?.lowercase() ?: "" }.thenBy { it.bssid ?: it.eventId })
+        CHANNEL -> rows.sortedWith(compareBy<WifiObservation> { it.frequencyMhz ?: Int.MAX_VALUE }
+            .thenBy { it.bssid ?: it.eventId })
+    }
+}
+
 data class WifiObservation(
     val eventId: String,
     val ssid: String?,

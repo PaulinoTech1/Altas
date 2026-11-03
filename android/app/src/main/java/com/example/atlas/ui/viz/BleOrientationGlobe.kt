@@ -59,6 +59,11 @@ fun BleOrientationGlobe(
         samples.mapNotNull { OrientationGlobeMath.project(it, yaw, pitch, zoom) }
     }
     val activeAddress = selectedAddress?.takeIf { address -> samples.any { it.address == address } }
+    val visiblePoints = remember(projected, activeAddress) {
+        if (activeAddress == null) projected else projected.filter { it.event.address == activeAddress }
+    }
+    val addresses = remember(samples) { samples.map { it.address }.distinct() }
+    val addressIndex = addresses.indexOf(activeAddress)
     val candidates = if (activeAddress == null) samples else samples.filter { it.address == activeAddress }
     val chosen = candidates.firstOrNull { it.eventId == selectedEventId } ?: candidates.firstOrNull()
     val chosenIndex = candidates.indexOfFirst { it.eventId == chosen?.eventId }
@@ -76,22 +81,41 @@ fun BleOrientationGlobe(
     }
 
     ChartCard("3D orientation signature") {
+        Text(if (activeAddress != null) "Isolated address: $activeAddress (${candidates.size} paired samples)"
+             else "All observed addresses (${samples.size} paired samples)",
+            style = MaterialTheme.typography.bodyMedium)
+        if (selectedAddress != null) OutlinedButton(onClick = { selectedEventId = null; onSelectAddress(null) }) {
+            Text("Show all addresses")
+        }
+        if (activeAddress != null) {
+            val strengths = candidates.mapNotNull { it.rssiDbm }
+            Text("Address ${addressIndex + 1}/${addresses.size} · Latest ${candidates.first().rssiDbm} dBm · " +
+                "Range ${strengths.minOrNull()} to ${strengths.maxOrNull()} dBm · " +
+                "First ${TimeFormats.dateTime(candidates.minOf { it.observedAtMillis })}",
+                style = MaterialTheme.typography.bodySmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { selectedEventId = null; onSelectAddress(addresses[addressIndex - 1]) },
+                    enabled = addressIndex > 0) { Text("Previous address") }
+                OutlinedButton(onClick = { selectedEventId = null; onSelectAddress(addresses[addressIndex + 1]) },
+                    enabled = addressIndex in 0 until addresses.lastIndex) { Text("Next address") }
+            }
+        }
         Canvas(Modifier.fillMaxWidth().aspectRatio(1f)
             .testTag("ble-orientation-globe")
             .semantics {
-                contentDescription = "3D phone orientation signature, ${samples.size} paired BLE samples. " +
+                contentDescription = "3D phone orientation signature, ${visiblePoints.size} visible of ${samples.size} paired BLE samples. " +
                     "Phone X, Y, Z axes have shared signal-strength ticks at -50, -70, -90, and -100 dBm. " +
-                    "Not physical distance. Drag to orbit, pinch to zoom, tap a point to inspect."
+                    "Not physical distance. Drag to orbit, pinch to zoom, tap a point to isolate its observed address."
                 stateDescription = "View yaw ${(yaw * 180f / PI.toFloat()).roundToInt()} degrees, " +
                     "pitch ${(pitch * 180f / PI.toFloat()).roundToInt()} degrees, zoom ${"%.1f".format(zoom)} times"
             }
-            .pointerInput(projected) {
+            .pointerInput(visiblePoints) {
                 detectTapGestures { tap ->
                     val radius = minOf(size.width, size.height) * 0.43f
                     if (radius <= 0f) return@detectTapGestures
                     val x = (tap.x - size.width / 2f) / radius
                     val y = (tap.y - size.height / 2f) / radius
-                    OrientationGlobeMath.hit(x, y, projected, 28.dp.toPx() / radius)?.event?.let {
+                    OrientationGlobeMath.hit(x, y, visiblePoints, 28.dp.toPx() / radius)?.event?.let {
                         selectedEventId = it.eventId
                         onSelectAddress(it.address)
                     }
@@ -134,19 +158,18 @@ fun BleOrientationGlobe(
                 drawText(end, topLeft = Offset((positive.x + 4f).coerceIn(0f, (size.width - end.size.width).coerceAtLeast(0f)),
                     labelY.coerceIn(0f, (size.height - end.size.height).coerceAtLeast(0f))))
             }
-            for (point in projected.sortedBy { it.depth }) {
+            for (point in visiblePoints.sortedBy { it.depth }) {
                 val event = point.event
                 val position = Offset(center.x + point.x * radius, center.y + point.y * radius)
                 val strength = ((event.rssiDbm!! + 100f) / 70f).coerceIn(0f, 1f)
                 val depth = ((point.depth + 1f) / 2f).coerceIn(0f, 1f)
-                val emphasis = if (activeAddress == null || event.address == activeAddress) 1f else 0.16f
                 val color = seriesColor(event.address, dark)
                 val dotRadius = 5f + strength * 5f
-                drawCircle(color.copy(alpha = (0.35f + depth * 0.6f) * emphasis), dotRadius, position)
+                drawCircle(color.copy(alpha = 0.35f + depth * 0.6f), dotRadius, position)
                 if (event.eventId == chosen?.eventId) drawCircle(colors.onSurface, dotRadius + 5f, position, style = Stroke(2f))
             }
         }
-        Text("Drag to orbit · pinch to zoom · tap a point. Touch targets extend beyond visible dots.",
+        Text("Drag to orbit · pinch to zoom · tap a point to isolate its observed address. Touch targets extend beyond visible dots.",
             style = MaterialTheme.typography.bodySmall)
         Text("X, Y, Z are phone-orientation axes. Each colored axis has ticks at -50, -70, -90, -100 dBm; numbers on X label the shared scale. Stronger signal is toward center. Axes and shells are not device coordinates or range.",
             style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
@@ -160,9 +183,6 @@ fun BleOrientationGlobe(
             OutlinedButton(onClick = { selectedEventId = candidates[chosenIndex - 1].eventId },
                 enabled = chosenIndex > 0) { Text("Newer point") }
             OutlinedButton(onClick = { yaw = 0.55f; pitch = -0.35f; zoom = 1f }) { Text("Reset view") }
-            if (selectedAddress != null) OutlinedButton(onClick = { selectedEventId = null; onSelectAddress(null) }) {
-                Text("Show all devices")
-            }
         }
         if (chosen != null) {
             Text("Selected point ${chosenIndex + 1}/${candidates.size}: ${chosen.rssiDbm} dBm · " +

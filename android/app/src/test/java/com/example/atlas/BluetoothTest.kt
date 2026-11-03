@@ -87,6 +87,21 @@ class BluetoothTest {
         assertNull(event().ageMillis(1))
     }
 
+    @Test fun deviceSortingHandlesSignalCountsNamesAndMissingValues() {
+        fun device(address: String, time: Long, rssi: Int?, count: Long, name: String?) =
+            BleDeviceHistory(event(address, time).copy(rssiDbm = rssi,
+                advertisement = Advertisement(name = name)), time, count)
+        val devices = listOf(
+            device("A", 1, -80, 4, "Zulu"),
+            device("B", 3, null, 20, null),
+            device("C", 2, -50, 7, "alpha")
+        )
+        assertEquals(listOf("B", "C", "A"), BleDeviceSort.RECENT.order(devices).map { it.latest.address })
+        assertEquals(listOf("C", "A", "B"), BleDeviceSort.STRONGEST.order(devices).map { it.latest.address })
+        assertEquals(listOf("B", "C", "A"), BleDeviceSort.MOST_SEEN.order(devices).map { it.latest.address })
+        assertEquals(listOf("C", "A", "B"), BleDeviceSort.NAME.order(devices).map { it.latest.address })
+    }
+
     @Test fun surveyPolicyIncludesLocationWithoutAdvertisingOrBackgroundAccess() {
         assertEquals(setOf("android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT",
             "android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"),

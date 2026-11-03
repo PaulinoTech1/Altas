@@ -100,6 +100,9 @@ fun LazyListScope.bluetoothContent(
             OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
         }
     }
+    item(key = "ble-orientation-globe") {
+        BleOrientationGlobe(state.history, state.scanning, state.selectedAddress, state.sessionStartedAtMillis, viewModel::select)
+    }
     item {
         ItemColumn {
             SectionTitle("GATT: ${gatt.status}")
@@ -142,9 +145,6 @@ fun LazyListScope.bluetoothContent(
             BleRadar(dots, state.scanning, state.selectedAddress, onSelect = { viewModel.select(it.address) })
         }
     }
-    item(key = "ble-orientation-globe") {
-        BleOrientationGlobe(state.history, state.scanning, state.selectedAddress, state.sessionStartedAtMillis, viewModel::select)
-    }
     item(key = "ble-signal-locator") {
         BleSignalLocator(state.history, state.selectedAddress, state.scanning, state.sessionStartedAtMillis,
             permissionsGranted, state.error, onStart = {
@@ -152,10 +152,22 @@ fun LazyListScope.bluetoothContent(
                 viewModel.start()
             }, onStop = { viewModel.stop("Stopped BLE search") })
     }
-    item { SectionTitle("Nearby BLE observations") }
+    item {
+        ItemColumn {
+            SectionTitle("Nearby BLE observations")
+            Text("Sort observed addresses; RSSI is signal strength, not distance.", style = MaterialTheme.typography.bodySmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BleDeviceSort.entries.forEach { sort ->
+                    FilterChip(selected = state.sort == sort, leadingIcon = chipCheck(state.sort == sort),
+                        onClick = { viewModel.sortBy(sort) }, label = { Text(sort.label) })
+                }
+            }
+        }
+    }
     if (state.devices.isEmpty()) item { Explanation("No BLE devices observed. Start a bounded scan; an empty scan is a valid outcome.") }
     val sparklines = RadarMath.sparklines(state.history)
-    items(state.devices, key = { "device-${it.latest.address}" }) { device ->
+    val sortedDevices = state.sort.order(state.devices)
+    items(sortedDevices, key = { "device-${it.latest.address}" }) { device ->
         DeviceRow(device, sparklines[device.latest.address].orEmpty(), state.selectedAddress == device.latest.address,
             { viewModel.select(if (state.selectedAddress == device.latest.address) null else device.latest.address) },
             { viewModel.connect(device.latest.address) }, { viewModel.select(device.latest.address) })
@@ -218,7 +230,7 @@ private fun DeviceRow(device: BleDeviceHistory, spark: List<Int>, expanded: Bool
                 Sparkline(spark)
             }
             Text("First: ${time(device.firstSeenMillis)} · Last: ${time(event.observedAtMillis)}", style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = locate) { Text("Locate signal") }
+            OutlinedButton(onClick = locate) { Text("Focus in 3D view above") }
             TextButton(onClick = select) { Text(if (expanded) "Hide advertisement" else "Inspect advertisement") }
             if (expanded) {
                 Text("Source elapsed time: ${event.sourceElapsedNanos ?: "unavailable"} ns")

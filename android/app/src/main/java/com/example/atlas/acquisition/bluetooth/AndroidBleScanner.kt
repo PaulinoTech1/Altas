@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicReference
 
 class AndroidBleScanner(context: Context, private val permissions: RadioPermissionManager) : BleScanner {
     private val app = context.applicationContext
@@ -44,15 +43,15 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
         val scanSessionId = UUID.randomUUID().toString()
         val sensors = app.getSystemService(SensorManager::class.java)
         val orientationSensor = sensors?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
-        // Sensor events and BLE callbacks may arrive on different threads. A single immutable snapshot is enough.
-        val latestOrientation = AtomicReference<PhoneOrientation?>()
+        // Sensor events and BLE callbacks may arrive on different threads or in different orders.
+        val orientations = PhoneOrientationMatcher()
         val orientationListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 if (event.sensor.type != Sensor.TYPE_GAME_ROTATION_VECTOR || event.values.size < 3) return
                 val matrix = FloatArray(9)
                 SensorManager.getRotationMatrixFromVector(matrix, event.values)
                 if (matrix[2].isFinite() && matrix[5].isFinite() && matrix[8].isFinite())
-                    latestOrientation.set(PhoneOrientation(matrix[2], matrix[5], matrix[8], event.timestamp))
+                    orientations.record(PhoneOrientation(matrix[2], matrix[5], matrix[8], event.timestamp))
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
@@ -65,12 +64,9 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
 
             private fun deliver(result: ScanResult) {
                 try {
-                    val source = result.timestampNanos.takeIf { it > 0 }
                     val received = SystemClock.elapsedRealtimeNanos()
-                    val observationTime = source?.takeIf { it <= received } ?: received
-                    val orientation = latestOrientation.get()?.takeIf {
-                        observationTime >= it.elapsedNanos && observationTime - it.elapsedNanos <= 250_000_000L
-                    }
+                    val source = result.timestampNanos.takeIf { it in 1..received }
+                    val orientation = source?.let(orientations::atOrBefore)
                     val event = BleObservation(
                         UUID.randomUUID().toString(), result.device.address,
                         System.currentTimeMillis(), received, source,

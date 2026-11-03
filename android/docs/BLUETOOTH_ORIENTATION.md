@@ -6,6 +6,8 @@ The 3D sphere plots the **phone's facing direction when a BLE advertisement was 
 
 The interactive view uses the existing 2D radar's -30 to -100 dBm strength scale for concentric 3D signal shells. Stronger samples sit closer to the center, with a small inner radius so they remain selectable. Dragging orbits the view; pinching zooms it up to 2.5x. Taps use a 28 dp hit radius, and Older/Newer controls step through overlapping observations while showing the exact RSSI, address/name, and timestamp. These controls transform the display only; they do not change collected measurements or start a scan.
 
+Tapping a point now isolates all paired samples for that observed BLE address in the 3D plot. The header reports the isolated address, sample count, latest and range of RSSI readings, and first observed time. **Previous address** and **Next address** move between observed series, and **Show all addresses** restores the full session view. Isolation is visual filtering, not a claim that rotating or spoofed BLE addresses belong to one physical device. Selecting an address in the device list applies the same plot filter when that address has paired orientation samples.
+
 The plot now draws colored +X, +Y, and +Z **phone-orientation** axes in an oblique default view. Each axis uses the same -50, -70, -90, and -100 dBm tick positions as the signal shells; numeric labels along X explain the shared scale, and each positive axis endpoint is marked at -100 dBm. Axes rotate with the samples. They are reference directions for handset orientation, not coordinates of nearby devices.
 
 | Assumption | Status | Impact if wrong | Validation |

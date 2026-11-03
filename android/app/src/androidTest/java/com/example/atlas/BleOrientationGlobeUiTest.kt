@@ -1,6 +1,9 @@
 package com.example.atlas
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +24,37 @@ import org.junit.Test
 
 class BleOrientationGlobeUiTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun tappingPointIsolatesAddressAndShowAllRestoresPlot() {
+        var chosenAddress by mutableStateOf<String?>(null)
+        val samples = listOf(
+            BleObservation("a", "AA", 2L, 2L, null, -50, true, Advertisement(name = "First"),
+                phoneOrientation = PhoneOrientation(1f, 0f, 0f, 2L), orientationSessionId = "scan"),
+            BleObservation("b", "BB", 1L, 1L, null, -80, true, Advertisement(name = "Second"),
+                phoneOrientation = PhoneOrientation(-1f, 0f, 0f, 1L), orientationSessionId = "scan")
+        )
+        compose.setContent {
+            MaterialTheme { BleOrientationGlobe(samples, false, chosenAddress, null) { chosenAddress = it } }
+        }
+        val plotted = OrientationGlobeMath.project(samples.first(), 0.55f, -0.35f, 1f)!!
+        compose.onNodeWithTag("ble-orientation-globe").performTouchInput {
+            val radius = minOf(width, height) * 0.43f
+            click(Offset(center.x + plotted.x * radius, center.y + plotted.y * radius))
+        }
+        compose.onNodeWithText("Isolated address: AA (1 paired samples)").assertExists()
+        val isolated = compose.onNodeWithTag("ble-orientation-globe")
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
+        org.junit.Assert.assertTrue(isolated.contains("1 visible of 2"))
+        compose.onNodeWithText("Next address").performClick()
+        compose.onNodeWithText("Isolated address: BB (1 paired samples)").assertExists()
+        compose.onNodeWithText("Previous address").performClick()
+        compose.onNodeWithText("Isolated address: AA (1 paired samples)").assertExists()
+        compose.onNodeWithText("Show all addresses").performClick()
+        compose.onNodeWithText("All observed addresses (2 paired samples)").assertExists()
+        val restored = compose.onNodeWithTag("ble-orientation-globe")
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
+        org.junit.Assert.assertTrue(restored.contains("2 visible of 2"))
+    }
 
     @Test fun tapAndTraversalExposeExactDbm() {
         var chosenAddress: String? = null

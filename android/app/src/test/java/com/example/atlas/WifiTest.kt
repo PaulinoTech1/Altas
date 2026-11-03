@@ -22,6 +22,16 @@ class WifiTest {
         1_700_000_000_000, 2_000_000, source, 500_000, delivery
     )
 
+    @Test fun apSortingKeepsMissingSignalAndIdentifiersLast() {
+        val weak = row(source = 1, bssid = "A").copy(ssid = "Zulu", rssiDbm = -80, frequencyMhz = 5180)
+        val strong = row(source = 3, bssid = "B").copy(ssid = "alpha", rssiDbm = -45, frequencyMhz = 2412)
+        val unknown = row(source = null, bssid = "C").copy(ssid = null, rssiDbm = null, frequencyMhz = null)
+        val rows = listOf(weak, unknown, strong)
+        for (sort in WifiApSort.entries) {
+            assertEquals(listOf("B", "A", "C"), sort.order(rows).map { it.bssid })
+        }
+    }
+
     @Test fun channelMappingHandlesBandsAndSpecialCases() {
         mapOf(2412 to 1, 2437 to 6, 2472 to 13, 2484 to 14, 5180 to 36, 5500 to 100,
             5885 to 177, 5935 to 2, 5955 to 1, 5975 to 5, 7115 to 233, 58320 to 1, 69120 to 6).forEach { (freq, expected) ->

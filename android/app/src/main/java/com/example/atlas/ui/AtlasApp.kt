@@ -56,6 +56,7 @@ import com.example.atlas.model.RadioState
 import com.example.atlas.model.RadioType
 import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
 import com.example.atlas.acquisition.wifi.WifiViewModel
+import com.example.atlas.acquisition.wifi.TcpScanViewModel
 import com.example.atlas.acquisition.cellular.CellularViewModel
 import com.example.atlas.acquisition.nfc.NfcViewModel
 import com.example.atlas.telemetry.TelemetryViewModel
@@ -78,6 +79,7 @@ fun AtlasApp(
     viewModel: DashboardViewModel,
     bluetooth: BluetoothViewModel,
     wifiSurvey: WifiViewModel,
+    tcpScan: TcpScanViewModel,
     cellular: CellularViewModel,
     nfc: NfcViewModel,
     telemetry: TelemetryViewModel,
@@ -96,6 +98,7 @@ fun AtlasApp(
     val ble by bluetooth.state.collectAsStateWithLifecycle()
     val gatt by bluetooth.gatt.state.collectAsStateWithLifecycle()
     val wifi by wifiSurvey.state.collectAsStateWithLifecycle()
+    val tcp by tcpScan.state.collectAsStateWithLifecycle()
     val cell by cellular.state.collectAsStateWithLifecycle()
     val nfcState by nfc.state.collectAsStateWithLifecycle()
     val storage by telemetry.state.collectAsStateWithLifecycle()
@@ -118,7 +121,7 @@ fun AtlasApp(
     }
     val wifiVisible = selected?.type == RadioType.WIFI
     DisposableEffect(wifiVisible) {
-        onDispose { if (wifiVisible) wifiSurvey.stop("Stopped — Wi-Fi screen inactive") }
+        onDispose { if (wifiVisible) { wifiSurvey.stop("Stopped — Wi-Fi screen inactive"); tcpScan.stop() } }
     }
     val cellularVisible = selected?.type == RadioType.CELLULAR
     DisposableEffect(cellularVisible) {
@@ -176,7 +179,7 @@ fun AtlasApp(
                 val sessionMessage = when {
                     nfcState.reading -> "NFC reader active. Leaving NFC stops reader mode."
                     cell.collecting -> "Cellular collection active. Leaving Cellular stops app collection."
-                    wifi.collecting -> "Wi-Fi survey active. Leaving Wi-Fi stops app collection."
+                    wifi.collecting || tcp.running -> "Wi-Fi survey or TCP scan active. Leaving Wi-Fi stops collection."
                     ble.scanning -> "BLE collection active. Leaving Bluetooth stops collection."
                     gatt.ready -> "Bluetooth connected. Leaving Bluetooth disconnects the device."
                     else -> null
@@ -207,7 +210,7 @@ fun AtlasApp(
                         { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings, replayOn
                     )
                     selected?.type == RadioType.WIFI -> wifiContent(
-                        selected, wifiSurvey, wifi, wifiPermissionsMissing, { wifiNowMicros.value }, radioNotice, cue(RadioType.WIFI), saveAll,
+                        selected, wifiSurvey, wifi, tcpScan, tcp, wifiPermissionsMissing, { wifiNowMicros.value }, radioNotice, cue(RadioType.WIFI), saveAll,
                         onWifiPermissions, onAppSettings, replayOn
                     )
                     selected?.type == RadioType.CELLULAR -> cellularContent(

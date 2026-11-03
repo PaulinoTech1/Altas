@@ -17,6 +17,7 @@ import com.example.atlas.acquisition.bluetooth.AndroidGattClient
 import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
 import com.example.atlas.acquisition.wifi.AndroidWifiSurveyRepository
 import com.example.atlas.acquisition.wifi.WifiViewModel
+import com.example.atlas.acquisition.wifi.TcpScanViewModel
 import com.example.atlas.acquisition.cellular.AndroidCellularRepository
 import com.example.atlas.acquisition.cellular.CellularViewModel
 import com.example.atlas.acquisition.nfc.AndroidNfcReader
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var dashboard: DashboardViewModel
     private lateinit var bluetooth: BluetoothViewModel
     private lateinit var wifiSurvey: WifiViewModel
+    private lateinit var tcpScan: TcpScanViewModel
     private lateinit var cellular: CellularViewModel
     private lateinit var nfc: NfcViewModel
     private lateinit var telemetry: TelemetryViewModel
@@ -68,6 +70,7 @@ class MainActivity : ComponentActivity() {
         wifiSurvey = ViewModelProvider(this, WifiViewModel.Factory(
             AndroidWifiSurveyRepository(applicationContext, permissions)
         ))[WifiViewModel::class.java]
+        tcpScan = ViewModelProvider(this, TcpScanViewModel.Factory(applicationContext))[TcpScanViewModel::class.java]
         cellular = ViewModelProvider(this, CellularViewModel.Factory(
             AndroidCellularRepository(applicationContext, permissions)
         ))[CellularViewModel::class.java]
@@ -78,7 +81,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AtlasTheme {
-                AtlasApp(dashboard, bluetooth, wifiSurvey, cellular, nfc, telemetry, blePermissionsMissing, wifiPermissionsMissing, cellularPermissionsMissing,
+                AtlasApp(dashboard, bluetooth, wifiSurvey, tcpScan, cellular, nfc, telemetry, blePermissionsMissing, wifiPermissionsMissing, cellularPermissionsMissing,
                     onExport = { redact ->
                         exportRedacted = redact
                         try { exportDocument.launch("atlas-rf-${System.currentTimeMillis()}.json") }

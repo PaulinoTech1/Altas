@@ -4,19 +4,27 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import com.example.atlas.ui.viz.SpectrumMath
 import com.example.atlas.ui.viz.WifiSpectrum
 import com.example.atlas.ui.viz.ReplayChart
@@ -34,6 +42,8 @@ fun LazyListScope.wifiContent(
     radio: RadioCapability,
     viewModel: WifiViewModel,
     state: WifiUiState,
+    tcpScan: TcpScanViewModel,
+    tcp: TcpScanUiState,
     missingPermissions: List<String>,
     nowElapsedMicros: () -> Long,
     sessionNotice: String,
@@ -112,6 +122,7 @@ fun LazyListScope.wifiContent(
         val channels = state.rows.filter { it.channel != null }.groupingBy { "${WifiValues.band(it.frequencyMhz)} / ${it.channel}" }.eachCount()
         Text(channels.toSortedMap().entries.joinToString(" · ") { "${it.key}: ${it.value}" }.ifEmpty { "No valid channels reported" })
     } }
+    item(key = "tcp-port-scan") { TcpPortScanCard(tcpScan, tcp, replay != null) }
     item { ItemColumn {
         SectionTitle("Reported Wi-Fi connections")
         ExpandableNotice("Link rates are reported by Android, not measured throughput.",
@@ -135,12 +146,18 @@ fun LazyListScope.wifiContent(
         SectionTitle("Access points")
         ExpandableNotice("Rows become stale 30 seconds after their source timestamp.",
             "Source timestamps determine age; rows become stale after 30 seconds. Empty SSIDs may be hidden or redacted. Channel numbers do not establish regional authorization.")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WifiApSort.entries.forEach { sort ->
+                FilterChip(selected = state.sort == sort, onClick = { viewModel.sortBy(sort) }, label = { Text(sort.label) })
+            }
+        }
         if (state.rows.isEmpty()) Explanation("No access points reported. Cache may be empty, or a scan may be pending, restricted or unsupported.")
     } }
     // B8: keyed by BSSID so a rescan updates rows in place (eventId changes every scan); StableKeys never duplicates.
-    val apKeys = StableKeys.of(state.rows, { row -> row.bssid?.let { "ap-$it" } }, { row -> "ap-${row.eventId}" })
-    items(state.rows.size, key = { apKeys[it] }) { index ->
-        val row = state.rows[index]
+    val sortedRows = state.sort.order(state.rows)
+    val apKeys = StableKeys.of(sortedRows, { row -> row.bssid?.let { "ap-$it" } }, { row -> "ap-${row.eventId}" })
+    items(sortedRows.size, key = { apKeys[it] }) { index ->
+        val row = sortedRows[index]
         Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(row.ssid ?: "SSID hidden / unavailable", style = MaterialTheme.typography.titleMedium)
@@ -168,6 +185,47 @@ fun LazyListScope.wifiContent(
         add("Sessions stop after 60 seconds. No automatic retries. Requests are spaced by at least 30 seconds and limited to four per two minutes; Android can further restrict scans.")
         add("Stop unregisters Atlas callbacks. Android provides no cancellation API for a hardware scan already requested.")
     })
+}
+
+@Composable
+private fun TcpPortScanCard(viewModel: TcpScanViewModel, state: TcpScanUiState, replay: Boolean) {
+    var host by rememberSaveable { mutableStateOf("") }
+    var first by rememberSaveable { mutableStateOf("1") }
+    var last by rememberSaveable { mutableStateOf("1024") }
+    var authorized by rememberSaveable { mutableStateOf(false) }
+    SectionCard {
+        SectionTitle("TCP ports on one host")
+        Text("Connect-only checks over the current Wi-Fi network. One numeric IPv4 target; up to 4,096 ports per run. Open means a TCP connection succeeded. Other outcomes do not prove a port is closed.",
+            style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(value = host, onValueChange = { host = it.take(15) }, singleLine = true,
+            label = { Text("Target IPv4 address") }, modifier = Modifier.fillMaxWidth())
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { first = "1"; last = "1024" }, enabled = !state.running) { Text("1–1024") }
+            OutlinedButton(onClick = { first = "1"; last = "4096" }, enabled = !state.running) { Text("1–4096") }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value = first, onValueChange = { first = it.take(5).filter(Char::isDigit) },
+                label = { Text("First port") }, singleLine = true)
+            OutlinedTextField(value = last, onValueChange = { last = it.take(5).filter(Char::isDigit) },
+                label = { Text("Last port") }, singleLine = true)
+        }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Checkbox(checked = authorized, onCheckedChange = { authorized = it }, enabled = !state.running)
+            Text("I own or am authorized to test this host")
+        }
+        if (state.running) Button(onClick = viewModel::stop) { Text("Stop TCP scan") }
+        else Button(onClick = {
+            viewModel.start(TcpScanRequest(host.trim(), first.toIntOrNull() ?: -1, last.toIntOrNull() ?: -1))
+            authorized = false
+        }, enabled = authorized && !replay) { Text("Scan selected host") }
+        if (replay) Text("Turn off Demo replay to start a live TCP scan.", style = MaterialTheme.typography.bodySmall)
+        Text("${state.status}${state.host?.let { " · $it" } ?: ""}")
+        state.error?.let { DiagnosticNotice("TCP", it) }
+        state.progress?.let { progress ->
+            Text("${progress.tested}/${progress.total} tested · ${progress.openPorts.size} connected · ${progress.noConnection} no connection · ${progress.timedOut} timed out · ${progress.errors} errors")
+            if (progress.openPorts.isNotEmpty()) Text("Connected TCP ports: ${progress.openPorts.joinToString()}")
+        }
+    }
 }
 
 private const val WIFI_RATIONALE_SUMMARY = "Wi-Fi surveying can reveal location."
