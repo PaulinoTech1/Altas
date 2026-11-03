@@ -86,21 +86,23 @@ fun LazyListScope.wifiContent(
         }
     }
     item(key = "wifi-access") {
-        SectionCard {
             val permissionLine = "Survey permission: ${if (permissionsGranted) "Granted" else "Precise location needed"}"
             if (permissionsGranted) {
                 AccessGrantedRow(permissionLine) {
-                    OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
+                    TextButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
                 }
             } else {
-                Text(permissionLine, style = MaterialTheme.typography.titleSmall)
-                ExpandableNotice(WIFI_RATIONALE_SUMMARY, WIFI_RATIONALE, showFull = true)
-                OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
-                TextButton(onClick = openSettings) { Text("App permission settings") }
-                PermissionGuidance()
+                SectionCard {
+                    Text(permissionLine, style = MaterialTheme.typography.titleSmall)
+                    ExpandableNotice(WIFI_RATIONALE_SUMMARY, WIFI_RATIONALE, showFull = true)
+                    OutlinedButton(onClick = requestPermissions) { Text("Review Wi-Fi permissions") }
+                    TextButton(onClick = openSettings) { Text("App permission settings") }
+                    PermissionGuidance()
+                }
             }
-        }
     }
+    // TCP checks are independent of AP surveying; keep the explicit host tool reachable before the charts.
+    item(key = "tcp-port-scan") { TcpPortScanCard(tcpScan, tcp, replay != null) }
     // V1: spectrum above the text summary and list; tapping a hump selects the same AP the list expands.
     item(key = "wifi-spectrum") {
         if (replay != null) {
@@ -114,7 +116,8 @@ fun LazyListScope.wifiContent(
     item { ItemColumn {
         SectionTitle("Survey summary")
         Text("Android scan throttling: ${when (state.osScanThrottlingEnabled) { true -> "Enabled"; false -> "Disabled"; null -> "Not reported" }}")
-        OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear Wi-Fi history") }
+        ClearHistoryControl("Clear Wi-Fi history", state.rows.isNotEmpty() || state.history.isNotEmpty() || state.connections.isNotEmpty(),
+            state.collecting, unsaved, viewModel::clear)
         Text("${state.rows.size} displayed AP rows / ${state.totalRows} reported · ${state.history.size}/1024 distinct source samples retained")
         Text("${state.updatedBroadcasts} updated platform broadcasts / ${state.scanBroadcasts} total. Broadcasts are shared across apps; an update is not proof this app caused the scan.")
         state.rows.groupingBy { WifiValues.band(it.frequencyMhz) }.eachCount().toSortedMap().forEach { (band, count) -> Text("$band: $count reported rows") }
@@ -122,7 +125,6 @@ fun LazyListScope.wifiContent(
         val channels = state.rows.filter { it.channel != null }.groupingBy { "${WifiValues.band(it.frequencyMhz)} / ${it.channel}" }.eachCount()
         Text(channels.toSortedMap().entries.joinToString(" · ") { "${it.key}: ${it.value}" }.ifEmpty { "No valid channels reported" })
     } }
-    item(key = "tcp-port-scan") { TcpPortScanCard(tcpScan, tcp, replay != null) }
     item { ItemColumn {
         SectionTitle("Reported Wi-Fi connections")
         ExpandableNotice("Link rates are reported by Android, not measured throughput.",

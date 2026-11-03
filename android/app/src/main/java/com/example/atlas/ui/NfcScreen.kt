@@ -62,7 +62,8 @@ fun LazyListScope.nfcContent(radio: RadioCapability, vm: NfcViewModel, state: Nf
     item { ItemColumn {
         SectionTitle("Detected tags")
         if (state.tags.isEmpty()) Explanation("No physical tag has been read in this session.")
-        else OutlinedButton(onClick = vm::clear, enabled = !state.reading) { Text("Clear NFC history") }
+        ClearHistoryControl("Clear NFC history", state.tags.isNotEmpty() || state.exchanges.isNotEmpty(),
+            state.reading, unsaved, vm::clear)
     } }
     // B8: keyed by time + tag id rather than list index, so new tags at the top do not re-key every row.
     val tagKeys = StableKeys.of(state.tags, { tag -> "tag-${tag.observedAtMillis}-${tag.idHex}" }, { tag -> "tag-${tag.observedAtMillis}" })

@@ -51,6 +51,14 @@ fun BleOrientationGlobe(
             session != null && it.orientationSessionId == session && it.phoneOrientation != null && it.rssiDbm != null
         }.take(256).toList()
     }
+    if (samples.isEmpty()) {
+        ChartCard("3D orientation signature") {
+            Text(if (scanning) "Waiting for paired orientation and signal observations."
+                 else "Start a BLE scan to collect orientation and signal observations.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+        return
+    }
     var yaw by remember(session) { mutableFloatStateOf(0.55f) }
     var pitch by remember(session) { mutableFloatStateOf(-0.35f) }
     var zoom by remember(session) { mutableFloatStateOf(1f) }

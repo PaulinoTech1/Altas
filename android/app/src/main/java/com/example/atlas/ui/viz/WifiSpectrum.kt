@@ -55,6 +55,13 @@ private const val HUMP_STEPS = 40
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WifiSpectrum(aps: List<SpectrumAp>, selectedKey: String?, onSelect: (SpectrumAp) -> Unit, replay: Boolean = false) {
+    if (aps.isEmpty()) {
+        ChartCard("Wi-Fi spectrum", replay) {
+            Text("No access points with signal readings yet. Start a Wi-Fi survey to populate the spectrum.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+        return
+    }
     var chosen by rememberSaveable { mutableStateOf<String?>(null) }
     val band = chosen?.let { name -> SpectrumMath.Band.entries.firstOrNull { it.name == name } } ?: SpectrumMath.defaultBand(aps)
     val inBand = remember(aps, band) { aps.filter { SpectrumMath.bandOf(it.primaryMhz) == band } }

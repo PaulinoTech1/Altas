@@ -41,6 +41,14 @@ const val RADAR_CAPTION = "Rings show signal strength, not distance. Position is
  */
 @Composable
 fun BleRadar(dots: List<RadarDot>, scanning: Boolean, selectedAddress: String?, onSelect: (RadarDot) -> Unit, replay: Boolean = false) {
+    if (dots.isEmpty()) {
+        ChartCard("Signal radar", replay) {
+            Text(if (scanning) "Waiting for BLE signal observations." else "Start a BLE scan to populate the radar.",
+                style = MaterialTheme.typography.bodySmall)
+            Text(RADAR_CAPTION, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
     val reduced = rememberReducedMotion()
     ChartCard("Signal radar", replay) {
         if (scanning && !reduced) {

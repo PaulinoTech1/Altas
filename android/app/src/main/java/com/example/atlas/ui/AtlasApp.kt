@@ -169,11 +169,6 @@ fun AtlasApp(
                 contentPadding = PaddingValues(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // B6: the page title lives in the top app bar (with an Up arrow on radio screens). The in-list text button stays
-                // as well (plan option b) because the DIT and physical tests find "Back to dashboard" by text in atlas-content.
-                if (selected != null) item(key = "back-to-dashboard") {
-                    TextButton(onClick = { page = "Dashboard" }) { Text("Back to dashboard") }
-                }
                 // Active sessions are announced on every page (the "Leaving X stops…" copy is a safety notice). When idle, only
                 // Overview and the radio screens get a one-line note; History, Settings and Project show nothing.
                 val sessionMessage = when {
@@ -247,7 +242,7 @@ fun AtlasApp(
                                 if (showDetails) {
                                     Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
                                     Text("Minimum API 31 · Target API 37 · Development preview")
-                                    Explanation("No background collector, Internet permission, cloud dependency or network listener. App backup is disabled.")
+                                    Explanation("No background collector, cloud dependency or network listener. The Internet permission supports only an explicitly started TCP host check. App backup is disabled.")
                                     Explanation("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
                                     Explanation("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
                                     Explanation("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")

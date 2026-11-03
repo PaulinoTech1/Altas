@@ -71,7 +71,6 @@ fun LazyListScope.bluetoothContent(
         }
     }
     item(key = "ble-access") {
-        SectionCard {
             val missingLabels = buildList {
                 if (missingPermissions.any { it.contains("BLUETOOTH_") }) add("Nearby devices")
                 if (missingPermissions.any { it.endsWith("_LOCATION") }) add("Precise location")
@@ -79,25 +78,26 @@ fun LazyListScope.bluetoothContent(
             val permissionLine = "Survey permissions: ${if (missingLabels.isEmpty()) "Granted" else "Needed: ${missingLabels.joinToString()}"}"
             if (permissionsGranted && radio.permission != PermissionState.REQUIRED) {
                 AccessGrantedRow(permissionLine) {
-                    OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
+                    TextButton(onClick = requestPermissions) { Text("Review BLE permissions") }
                 }
             } else {
-                Text(permissionLine, style = MaterialTheme.typography.titleSmall)
-                if (radio.permission == PermissionState.REQUIRED) {
-                    Button(onClick = requestStatePermission) { Text("Check Bluetooth state") }
+                SectionCard {
+                    Text(permissionLine, style = MaterialTheme.typography.titleSmall)
+                    if (radio.permission == PermissionState.REQUIRED) {
+                        Button(onClick = requestStatePermission) { Text("Check Bluetooth state") }
+                    }
+                    ExpandableNotice(BLE_RATIONALE_SUMMARY, BLE_RATIONALE, showFull = missingPermissions.isNotEmpty())
+                    OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
+                    TextButton(onClick = openSettings) { Text("App permission settings") }
+                    if (missingPermissions.isNotEmpty()) PermissionGuidance()
                 }
-                ExpandableNotice(BLE_RATIONALE_SUMMARY, BLE_RATIONALE, showFull = missingPermissions.isNotEmpty())
-                OutlinedButton(onClick = requestPermissions) { Text("Review BLE permissions") }
-                TextButton(onClick = openSettings) { Text("App permission settings") }
-                if (missingPermissions.isNotEmpty()) PermissionGuidance()
             }
-        }
     }
     item(key = "ble-results") {
         ItemColumn {
             SectionTitle("BLE collection")
             Text("${state.devices.size} retained addresses · ${state.receivedCount} received observations · ${state.history.size}/1024 history entries")
-            OutlinedButton(onClick = viewModel::clearHistory, enabled = !state.scanning) { Text("Clear BLE history") }
+            ClearHistoryControl("Clear BLE history", state.history.isNotEmpty(), state.scanning, unsaved, viewModel::clearHistory)
         }
     }
     item(key = "ble-orientation-globe") {

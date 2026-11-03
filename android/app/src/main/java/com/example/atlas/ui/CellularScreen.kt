@@ -62,20 +62,20 @@ fun LazyListScope.cellularContent(
         }
     }
     item(key = "cell-access") {
-        SectionCard {
             val permissionLine = "Access: ${if (permissionsGranted) "Granted" else "Phone status and precise location required"}"
             if (permissionsGranted) {
                 AccessGrantedRow(permissionLine) {
-                    OutlinedButton(onClick = requestPermissions) { Text("Review cellular permissions") }
+                    TextButton(onClick = requestPermissions) { Text("Review cellular permissions") }
                 }
             } else {
-                Text(permissionLine, style = MaterialTheme.typography.titleSmall)
-                ExpandableNotice(CELL_RATIONALE_SUMMARY, CELL_RATIONALE, showFull = true)
-                OutlinedButton(onClick = requestPermissions) { Text("Review cellular permissions") }
-                TextButton(onClick = openSettings) { Text("App permission settings") }
-                PermissionGuidance()
+                SectionCard {
+                    Text(permissionLine, style = MaterialTheme.typography.titleSmall)
+                    ExpandableNotice(CELL_RATIONALE_SUMMARY, CELL_RATIONALE, showFull = true)
+                    OutlinedButton(onClick = requestPermissions) { Text("Review cellular permissions") }
+                    TextButton(onClick = openSettings) { Text("App permission settings") }
+                    PermissionGuidance()
+                }
             }
-        }
     }
     // V3: dials and a live line above the text reports, which stay unchanged below.
     item(key = "cell-gauges") {
@@ -176,7 +176,8 @@ fun LazyListScope.cellularContent(
         state.signalHistory.take(8).forEach { report ->
             Text("${cellTime(report.receivedAtMillis)} · subscription ${report.subscriptionContext ?: "unavailable"} · ${report.signals.joinToString { signal -> "${signal.rat}: ${signal.metrics.joinToString { metric -> "${metric.name} ${metric.value ?: "unavailable"} ${metric.unit}" }}" }}", style = MaterialTheme.typography.bodySmall)
         }
-        OutlinedButton(onClick = viewModel::clear, enabled = !state.collecting) { Text("Clear cellular history") }
+        ClearHistoryControl("Clear cellular history", state.history.isNotEmpty() || state.signalHistory.isNotEmpty() ||
+            state.cells != null || state.signal != null, state.collecting, unsaved, viewModel::clear)
     } }
     aboutCollection("cell-about", buildList {
         if (permissionsGranted) add(CELL_RATIONALE)

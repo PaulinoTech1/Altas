@@ -100,7 +100,7 @@ class DashboardInstrumentedTest {
             compose.onNodeWithTag("atlas-content").performScrollToNode(hasText("Open $it"))
             compose.onNodeWithText("Open $it").assertIsDisplayed().performClick()
             compose.onNodeWithText("Hardware: Available", substring = true).assertIsDisplayed()
-            compose.onNodeWithText("Back to dashboard").performScrollTo().performClick()
+            compose.onNodeWithTag("nav-dashboard").performClick()
         }
         compose.onNodeWithTag("nav-history").assertIsDisplayed().performClick()
         val count = runBlocking { TelemetryRepository.get(compose.activity).dao.totalCount() }

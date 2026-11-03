@@ -118,7 +118,7 @@ class BlePhysicalInstrumentedTest {
         click("Start BLE scan")
         compose.waitUntil(2000) { vm.state.value.scanning || vm.state.value.error != null }
         assertNull(vm.state.value.error)
-        click("Back to dashboard")
+        compose.onNodeWithTag("nav-dashboard").performClick()
         compose.waitForIdle()
         assertFalse("Leaving Bluetooth must stop scan", vm.state.value.scanning)
         val afterNavigation = vm.state.value.receivedCount

@@ -76,8 +76,12 @@ fun LazyListScope.telemetryHistory(
                 val zone = ZoneId.systemDefault()
                 DailyCounts.byDay(buckets, zone, DailyCounts.epochDay(System.currentTimeMillis(), zone))
             }
-            HistoryChart(bars, radio) { radio = it }
             HistoryFilter(vm, radio) { radio = it }
+            var showChart by rememberSaveable { mutableStateOf(false) }
+            TextButton(onClick = { showChart = !showChart }) {
+                Text(if (showChart) "Hide activity chart" else "Show activity chart")
+            }
+            if (showChart) HistoryChart(bars, radio) { radio = it }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 Explanation("Up to 200 records per page, newest first.")
                 TextButton(onClick = openExport) { Text("Export…") }

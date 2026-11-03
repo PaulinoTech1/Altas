@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -86,4 +88,26 @@ fun AccessGrantedRow(line: String, action: @Composable () -> Unit) {
         Text(line)
         action()
     }
+}
+
+/** Clear only temporary observations, after an explicit decision; saved History is unaffected. */
+@Composable
+fun ClearHistoryControl(actionLabel: String, hasHistory: Boolean, active: Boolean, unsaved: UnsavedCue, onClear: () -> Unit) {
+    var confirm by rememberSaveable(actionLabel) { mutableStateOf(false) }
+    OutlinedButton(onClick = { confirm = true }, enabled = hasHistory && !active) { Text(actionLabel) }
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text("$actionLabel?") },
+        text = {
+            Text(buildString {
+                if (!unsaved.available) append("Atlas cannot verify whether these observations were saved. ")
+                else if (unsaved.count > 0) append("${unsaved.count} unsaved measurements may be lost. ")
+                append("This discards this radio's temporary observations and details. Records already saved in History remain.")
+            })
+        },
+        confirmButton = {
+            TextButton(onClick = { confirm = false; onClear() }, enabled = hasHistory && !active) { Text("Clear temporary history") }
+        },
+        dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } }
+    )
 }

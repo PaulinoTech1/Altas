@@ -103,7 +103,7 @@ class WifiPhysicalInstrumentedTest {
         // A second session may read cache/listen, but the guard prevents another hardware request.
         click("Start Wi-Fi survey")
         compose.waitUntil(3000) { vm.state.value.collecting }
-        click("Back to dashboard")
+        compose.onNodeWithTag("nav-dashboard").performClick()
         compose.waitForIdle()
         assertFalse("Navigation must stop collection", vm.state.value.collecting)
         val afterNavigation = vm.state.value.scanBroadcasts

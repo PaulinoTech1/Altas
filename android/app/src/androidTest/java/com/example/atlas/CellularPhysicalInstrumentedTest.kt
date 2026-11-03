@@ -98,7 +98,7 @@ class CellularPhysicalInstrumentedTest {
         compose.waitUntil(3000) { vm.state.value.collecting || vm.state.value.error != null }
         assertNull(vm.state.value.error)
         val previewNavigation = InstrumentationRegistry.getArguments().getString("atlas.previewNavigation") == "true"
-        if (previewNavigation) compose.onNodeWithTag("nav-history").performClick() else click("Back to dashboard")
+        if (previewNavigation) compose.onNodeWithTag("nav-history").performClick() else compose.onNodeWithTag("nav-dashboard").performClick()
         compose.waitForIdle()
         assertFalse(vm.state.value.collecting)
         val navigated = vm.state.value.eventCount
@@ -127,7 +127,7 @@ class CellularPhysicalInstrumentedTest {
         val vm = ViewModelProvider(compose.activity)[TelemetryViewModel::class.java]
         compose.waitUntil(5000) { vm.state.value.loaded || vm.state.value.error != null }
         assertNull(vm.state.value.error)
-        click("Back to dashboard"); click("History")
+        compose.onNodeWithTag("nav-dashboard").performClick(); click("History")
         compose.waitUntil(5000) { !vm.state.value.busy }
         click("Save session measurements")
         compose.waitUntil(10000) { !vm.state.value.busy && vm.state.value.message?.startsWith("Save finished") == true }
