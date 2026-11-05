@@ -57,6 +57,7 @@ import com.example.atlas.model.RadioType
 import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
 import com.example.atlas.acquisition.wifi.WifiViewModel
 import com.example.atlas.acquisition.wifi.TcpScanViewModel
+import com.example.atlas.acquisition.wifi.LanDiscoveryViewModel
 import com.example.atlas.acquisition.cellular.CellularViewModel
 import com.example.atlas.acquisition.nfc.NfcViewModel
 import com.example.atlas.telemetry.TelemetryViewModel
@@ -80,15 +81,18 @@ fun AtlasApp(
     bluetooth: BluetoothViewModel,
     wifiSurvey: WifiViewModel,
     tcpScan: TcpScanViewModel,
+    lanDiscovery: LanDiscoveryViewModel,
     cellular: CellularViewModel,
     nfc: NfcViewModel,
     telemetry: TelemetryViewModel,
     blePermissionsMissing: List<String>,
     wifiPermissionsMissing: List<String>,
+    localNetworkPermissionsMissing: List<String>,
     cellularPermissionsMissing: List<String>,
     onExport: (Boolean) -> Unit,
     onCellularPermissions: () -> Unit,
     onWifiPermissions: () -> Unit,
+    onLocalNetworkPermissions: () -> Unit,
     onBlePermissions: () -> Unit,
     onRequestPermission: (RadioType) -> Unit,
     onAppSettings: () -> Unit,
@@ -99,6 +103,7 @@ fun AtlasApp(
     val gatt by bluetooth.gatt.state.collectAsStateWithLifecycle()
     val wifi by wifiSurvey.state.collectAsStateWithLifecycle()
     val tcp by tcpScan.state.collectAsStateWithLifecycle()
+    val lan by lanDiscovery.state.collectAsStateWithLifecycle()
     val cell by cellular.state.collectAsStateWithLifecycle()
     val nfcState by nfc.state.collectAsStateWithLifecycle()
     val storage by telemetry.state.collectAsStateWithLifecycle()
@@ -121,7 +126,7 @@ fun AtlasApp(
     }
     val wifiVisible = selected?.type == RadioType.WIFI
     DisposableEffect(wifiVisible) {
-        onDispose { if (wifiVisible) { wifiSurvey.stop("Stopped — Wi-Fi screen inactive"); tcpScan.stop() } }
+        onDispose { if (wifiVisible) { wifiSurvey.stop("Stopped — Wi-Fi screen inactive"); tcpScan.stop(); lanDiscovery.stop() } }
     }
     val cellularVisible = selected?.type == RadioType.CELLULAR
     DisposableEffect(cellularVisible) {
@@ -174,7 +179,7 @@ fun AtlasApp(
                 val sessionMessage = when {
                     nfcState.reading -> "NFC reader active. Leaving NFC stops reader mode."
                     cell.collecting -> "Cellular collection active. Leaving Cellular stops app collection."
-                    wifi.collecting || tcp.running -> "Wi-Fi survey or TCP scan active. Leaving Wi-Fi stops collection."
+                    wifi.collecting || tcp.running || lan.running -> "Wi-Fi work active. Leaving Wi-Fi stops collection."
                     ble.scanning -> "BLE collection active. Leaving Bluetooth stops collection."
                     gatt.ready -> "Bluetooth connected. Leaving Bluetooth disconnects the device."
                     else -> null
@@ -184,7 +189,7 @@ fun AtlasApp(
                     page == "Dashboard" -> "All collectors idle. Choose a radio to begin."
                     else -> when (selected?.type) {
                         RadioType.BLUETOOTH -> "Bluetooth idle. Nothing is collected until you start a BLE scan."
-                        RadioType.WIFI -> "Wi-Fi idle. Nothing is collected until you start a survey."
+                        RadioType.WIFI -> "Wi-Fi idle. Start a survey, device discovery, or TCP host check to collect data."
                         RadioType.CELLULAR -> "Cellular idle. Nothing is collected until you start collection."
                         RadioType.NFC -> "NFC idle. Tags are read only after you start the reader."
                         null -> null
@@ -205,8 +210,9 @@ fun AtlasApp(
                         { onRequestPermission(RadioType.BLUETOOTH) }, onAppSettings, replayOn
                     )
                     selected?.type == RadioType.WIFI -> wifiContent(
-                        selected, wifiSurvey, wifi, tcpScan, tcp, wifiPermissionsMissing, { wifiNowMicros.value }, radioNotice, cue(RadioType.WIFI), saveAll,
-                        onWifiPermissions, onAppSettings, replayOn
+                        selected, wifiSurvey, wifi, tcpScan, tcp, lanDiscovery, lan, wifiPermissionsMissing,
+                        localNetworkPermissionsMissing, { wifiNowMicros.value }, radioNotice, cue(RadioType.WIFI), saveAll,
+                        onWifiPermissions, onLocalNetworkPermissions, onAppSettings, replayOn
                     )
                     selected?.type == RadioType.CELLULAR -> cellularContent(
                         selected, cellular, cell, cellularPermissionsMissing, { wifiNowMicros.value / 1000 }, radioNotice, cue(RadioType.CELLULAR), saveAll,
@@ -242,7 +248,7 @@ fun AtlasApp(
                                 if (showDetails) {
                                     Text("${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
                                     Text("Minimum API 31 · Target API 37 · Development preview")
-                                    Explanation("No background collector, cloud dependency or network listener. The Internet permission supports only an explicitly started TCP host check. App backup is disabled.")
+                                    Explanation("No background collector, cloud dependency or network listener. Internet and local network access support only explicitly started Wi-Fi device discovery and TCP host checks. App backup is disabled.")
                                     Explanation("BLE controls are on the Bluetooth screen. Temporary history is bounded to 256 addresses and 1,024 observations. Save from History to retain measurements.")
                                     Explanation("Wi-Fi uses explicit 60-second foreground sessions, bounded 1,024-sample history and scan rate limits. Stop cancels Atlas collection; an OS Wi-Fi scan already requested cannot be cancelled by public APIs.")
                                     Explanation("Cellular uses explicit 60-second sessions, 64 cell-report and 128 signal-report history limits. No protected subscriber identifiers are requested.")

@@ -44,12 +44,16 @@ fun LazyListScope.wifiContent(
     state: WifiUiState,
     tcpScan: TcpScanViewModel,
     tcp: TcpScanUiState,
+    lanDiscovery: LanDiscoveryViewModel,
+    lan: LanDiscoveryState,
     missingPermissions: List<String>,
+    localNetworkPermissionsMissing: List<String>,
     nowElapsedMicros: () -> Long,
     sessionNotice: String,
     unsaved: UnsavedCue,
     onSave: () -> Unit,
     requestPermissions: () -> Unit,
+    requestLocalNetworkPermissions: () -> Unit,
     openSettings: () -> Unit,
     replay: ReplayState? = null
 ) {
@@ -102,7 +106,12 @@ fun LazyListScope.wifiContent(
             }
     }
     // TCP checks are independent of AP surveying; keep the explicit host tool reachable before the charts.
-    item(key = "tcp-port-scan") { TcpPortScanCard(tcpScan, tcp, replay != null) }
+    item(key = "lan-discovery") {
+        LanDiscoveryCard(lanDiscovery, lan, localNetworkPermissionsMissing.isEmpty(), requestLocalNetworkPermissions, replay != null)
+    }
+    item(key = "tcp-port-scan") {
+        TcpPortScanCard(tcpScan, tcp, localNetworkPermissionsMissing.isEmpty(), requestLocalNetworkPermissions, replay != null)
+    }
     // V1: spectrum above the text summary and list; tapping a hump selects the same AP the list expands.
     item(key = "wifi-spectrum") {
         if (replay != null) {
@@ -190,7 +199,51 @@ fun LazyListScope.wifiContent(
 }
 
 @Composable
-private fun TcpPortScanCard(viewModel: TcpScanViewModel, state: TcpScanUiState, replay: Boolean) {
+private fun LanDiscoveryCard(viewModel: LanDiscoveryViewModel, state: LanDiscoveryState,
+                             permissionGranted: Boolean, requestPermission: () -> Unit, replay: Boolean) {
+    var authorized by rememberSaveable { mutableStateOf(false) }
+    SectionCard {
+        SectionTitle("Devices observed on this Wi-Fi")
+        Text("Checks up to 253 other private IPv4 addresses on TCP ports ${LanDiscoveryPolicy.ports.joinToString()}, and listens briefly for advertised network services. A service name or role is a device claim, not verified identity. Devices that block these ports, advertise no supported service, or are isolated may be absent.",
+            style = MaterialTheme.typography.bodySmall)
+        if (!permissionGranted) {
+            Text("Local network permission is needed for device discovery and TCP host checks.")
+            OutlinedButton(onClick = requestPermission) { Text("Allow local network access") }
+        }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Checkbox(checked = authorized, onCheckedChange = { authorized = it }, enabled = !state.running)
+            Text("I own or am authorized to test this Wi-Fi network")
+        }
+        if (state.running) Button(onClick = viewModel::stop) { Text("Stop device discovery") }
+        else Button(onClick = { viewModel.start(); authorized = false },
+            enabled = authorized && permissionGranted && !replay) { Text("Find devices") }
+        if (replay) Text("Turn off Demo replay to discover live devices.", style = MaterialTheme.typography.bodySmall)
+        Text(state.status)
+        state.target?.let { Text("Wi-Fi address: ${it.localAddress}/${it.prefixLength} · ${it.hosts.size} other addresses") }
+        state.progress?.let { progress ->
+            val devices = state.target?.let { LanDeviceEvidence.merge(it, progress.hosts, state.services) }.orEmpty()
+            Text("${progress.checked}/${progress.total} addresses checked · ${devices.size} observed")
+            if (progress.probeErrors > 0) Text("${progress.probeErrors} TCP probe errors; results may be incomplete.")
+            if (!state.running && devices.isEmpty()) Text("No device responded to these checks. This is not a complete network inventory.")
+            devices.forEach { device ->
+                Text(device.hostnames.firstOrNull() ?: device.address, style = MaterialTheme.typography.titleSmall)
+                if (device.hostnames.isNotEmpty()) Text("${device.address} · mDNS hostname: ${device.hostnames.joinToString()}")
+                device.networkRole?.let { Text("Network role: $it") }
+                if (device.advertisedRoles.isNotEmpty())
+                    Text("Advertised roles: ${device.advertisedRoles.joinToString()}")
+                else if (device.networkRole == null) Text("Device type: unknown")
+                if (device.services.isNotEmpty()) Text("mDNS services: " + device.services.joinToString { "${it.serviceName} (${it.serviceType})" })
+                if (device.respondingPorts.isNotEmpty()) Text("TCP connected: ${device.respondingPorts.joinToString()}")
+            }
+        }
+        state.serviceNotice?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        state.error?.let { DiagnosticNotice("LAN", it) }
+    }
+}
+
+@Composable
+private fun TcpPortScanCard(viewModel: TcpScanViewModel, state: TcpScanUiState,
+                            permissionGranted: Boolean, requestPermission: () -> Unit, replay: Boolean) {
     var host by rememberSaveable { mutableStateOf("") }
     var first by rememberSaveable { mutableStateOf("1") }
     var last by rememberSaveable { mutableStateOf("1024") }
@@ -199,6 +252,7 @@ private fun TcpPortScanCard(viewModel: TcpScanViewModel, state: TcpScanUiState, 
         SectionTitle("TCP ports on one host")
         Text("Connect-only checks over the current Wi-Fi network. One numeric IPv4 target; up to 4,096 ports per run. Open means a TCP connection succeeded. Other outcomes do not prove a port is closed.",
             style = MaterialTheme.typography.bodySmall)
+        if (!permissionGranted) OutlinedButton(onClick = requestPermission) { Text("Allow local network access") }
         OutlinedTextField(value = host, onValueChange = { host = it.take(15) }, singleLine = true,
             label = { Text("Target IPv4 address") }, modifier = Modifier.fillMaxWidth())
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -219,7 +273,7 @@ private fun TcpPortScanCard(viewModel: TcpScanViewModel, state: TcpScanUiState, 
         else Button(onClick = {
             viewModel.start(TcpScanRequest(host.trim(), first.toIntOrNull() ?: -1, last.toIntOrNull() ?: -1))
             authorized = false
-        }, enabled = authorized && !replay) { Text("Scan selected host") }
+        }, enabled = authorized && permissionGranted && !replay) { Text("Scan selected host") }
         if (replay) Text("Turn off Demo replay to start a live TCP scan.", style = MaterialTheme.typography.bodySmall)
         Text("${state.status}${state.host?.let { " · $it" } ?: ""}")
         state.error?.let { DiagnosticNotice("TCP", it) }

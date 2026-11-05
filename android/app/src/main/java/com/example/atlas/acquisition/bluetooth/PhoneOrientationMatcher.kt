@@ -1,7 +1,7 @@
 package com.example.atlas.acquisition.bluetooth
 
 /** Keeps recent sensor readings so a delayed BLE callback can use the reading at its RF timestamp. */
-class PhoneOrientationMatcher(private val capacity: Int = 64) {
+class PhoneOrientationMatcher(private val capacity: Int = 512) {
     init { require(capacity > 0) }
 
     private val readings = ArrayDeque<PhoneOrientation>()

@@ -7,10 +7,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxWidth
 import com.example.atlas.acquisition.bluetooth.BleObservation
+import com.example.atlas.acquisition.bluetooth.BleSignalAnalysis
 import com.example.atlas.ui.DiagnosticNotice
 import kotlinx.coroutines.delay
 
@@ -20,6 +24,11 @@ fun BleSignalLocator(
     history: List<BleObservation>, selectedAddress: String?, scanning: Boolean, startedAtMillis: Long?,
     canScan: Boolean, scanError: String?, onStart: () -> Unit, onStop: () -> Unit
 ) {
+    var guided by remember(selectedAddress) { mutableStateOf(false) }
+    val sweepHistory = remember(history, scanning, startedAtMillis) {
+        if (scanning && startedAtMillis != null) history.filter { it.observedAtMillis >= startedAtMillis } else history
+    }
+    val evidence = remember(sweepHistory, selectedAddress) { BleSignalAnalysis.summarize(sweepHistory, selectedAddress) }
     val nowElapsedNanos by produceState(SystemClock.elapsedRealtimeNanos(), scanning, selectedAddress) {
         while (scanning) {
             delay(1_000)
@@ -66,10 +75,22 @@ fun BleSignalLocator(
         if (scanning) {
             OutlinedButton(onClick = onStop) { Text("Stop BLE search") }
         } else {
-            OutlinedButton(onClick = onStart, enabled = selectedAddress != null && canScan) {
+            OutlinedButton(onClick = { guided = false; onStart() }, enabled = selectedAddress != null && canScan) {
                 Text("Start 20s focused search")
             }
+            OutlinedButton(onClick = { guided = true; onStart() }, enabled = selectedAddress != null && canScan) {
+                Text("Start guided 20s sweep")
+            }
             if (!canScan) Text("Grant BLE survey permissions to start a search.", style = MaterialTheme.typography.bodySmall)
+        }
+        if (guided && selectedAddress != null) {
+            Text(if (scanning) "Sweep in progress: stay in one place and slowly turn the phone through a full circle. " +
+                "Keep the same grip. Atlas does not measure your position."
+                else "Sweep review: ${evidence.pairedSamples} paired readings across " +
+                    "${evidence.comparableSectors.size} repeated phone-orientation sectors. " +
+                    if (evidence.repeatableCoverage) "Repeat from the same spot and compare patterns; no bearing is inferred."
+                    else "Inconclusive coverage; repeat only after the scan cooldown.",
+                style = MaterialTheme.typography.bodySmall)
         }
         Text("Walk slowly and compare several fresh readings. A stronger RSSI can suggest a better search area, but reflections, body position, transmit power and rotating addresses can mislead it. No direction, distance, map location or remote ring is available through this BLE scan.",
             style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)

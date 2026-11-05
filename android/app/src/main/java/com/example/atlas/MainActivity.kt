@@ -18,6 +18,7 @@ import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
 import com.example.atlas.acquisition.wifi.AndroidWifiSurveyRepository
 import com.example.atlas.acquisition.wifi.WifiViewModel
 import com.example.atlas.acquisition.wifi.TcpScanViewModel
+import com.example.atlas.acquisition.wifi.LanDiscoveryViewModel
 import com.example.atlas.acquisition.cellular.AndroidCellularRepository
 import com.example.atlas.acquisition.cellular.CellularViewModel
 import com.example.atlas.acquisition.nfc.AndroidNfcReader
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var bluetooth: BluetoothViewModel
     private lateinit var wifiSurvey: WifiViewModel
     private lateinit var tcpScan: TcpScanViewModel
+    private lateinit var lanDiscovery: LanDiscoveryViewModel
     private lateinit var cellular: CellularViewModel
     private lateinit var nfc: NfcViewModel
     private lateinit var telemetry: TelemetryViewModel
@@ -47,12 +49,14 @@ class MainActivity : ComponentActivity() {
     }
     private var blePermissionsMissing by mutableStateOf(emptyList<String>())
     private var wifiPermissionsMissing by mutableStateOf(emptyList<String>())
+    private var localNetworkPermissionsMissing by mutableStateOf(emptyList<String>())
     private var cellularPermissionsMissing by mutableStateOf(emptyList<String>())
     private val permissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         blePermissionsMissing = permissions.missingForBleScan()
         wifiPermissionsMissing = permissions.missingForWifiSurvey()
+        localNetworkPermissionsMissing = permissions.missingForLocalNetwork()
         cellularPermissionsMissing = permissions.missingForCellular()
         dashboard.refresh()
     }
@@ -71,6 +75,7 @@ class MainActivity : ComponentActivity() {
             AndroidWifiSurveyRepository(applicationContext, permissions)
         ))[WifiViewModel::class.java]
         tcpScan = ViewModelProvider(this, TcpScanViewModel.Factory(applicationContext))[TcpScanViewModel::class.java]
+        lanDiscovery = ViewModelProvider(this, LanDiscoveryViewModel.Factory(applicationContext))[LanDiscoveryViewModel::class.java]
         cellular = ViewModelProvider(this, CellularViewModel.Factory(
             AndroidCellularRepository(applicationContext, permissions)
         ))[CellularViewModel::class.java]
@@ -81,7 +86,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AtlasTheme {
-                AtlasApp(dashboard, bluetooth, wifiSurvey, tcpScan, cellular, nfc, telemetry, blePermissionsMissing, wifiPermissionsMissing, cellularPermissionsMissing,
+                AtlasApp(dashboard, bluetooth, wifiSurvey, tcpScan, lanDiscovery, cellular, nfc, telemetry, blePermissionsMissing, wifiPermissionsMissing, localNetworkPermissionsMissing, cellularPermissionsMissing,
                     onExport = { redact ->
                         exportRedacted = redact
                         try { exportDocument.launch("atlas-rf-${System.currentTimeMillis()}.json") }
@@ -96,6 +101,11 @@ class MainActivity : ComponentActivity() {
                         val missing = permissions.missingForWifiSurvey()
                         if (missing.isNotEmpty()) permissionRequest.launch(missing.toTypedArray())
                         wifiPermissionsMissing = permissions.missingForWifiSurvey()
+                    },
+                    onLocalNetworkPermissions = {
+                        val missing = permissions.missingForLocalNetwork()
+                        if (missing.isNotEmpty()) permissionRequest.launch(missing.toTypedArray())
+                        localNetworkPermissionsMissing = permissions.missingForLocalNetwork()
                     },
                     onBlePermissions = {
                         val missing = permissions.missingForBleScan()
@@ -120,12 +130,15 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         if (::permissions.isInitialized) blePermissionsMissing = permissions.missingForBleScan()
         if (::permissions.isInitialized) wifiPermissionsMissing = permissions.missingForWifiSurvey()
+        if (::permissions.isInitialized) localNetworkPermissionsMissing = permissions.missingForLocalNetwork()
         if (::permissions.isInitialized) cellularPermissionsMissing = permissions.missingForCellular()
         if (::dashboard.isInitialized) dashboard.refresh()
     }
 
     override fun onStop() {
         if (::bluetooth.isInitialized) bluetooth.stopAll()
+        if (::tcpScan.isInitialized) tcpScan.stop()
+        if (::lanDiscovery.isInitialized) lanDiscovery.stop()
         if (::wifiSurvey.isInitialized) wifiSurvey.stop("Stopped — app inactive")
         if (::cellular.isInitialized) cellular.stop("Stopped — app inactive")
         if (::nfc.isInitialized) nfc.stop("Stopped — app inactive")

@@ -15,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.atlas.acquisition.bluetooth.BleScanConfig
 import com.example.atlas.acquisition.bluetooth.BleScanMode
 import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
+import com.example.atlas.acquisition.bluetooth.BleSignalAnalysis
 import com.example.atlas.permissions.RadioPermissionManager
 import com.example.atlas.ui.viz.BleLocatorMath
 import org.junit.Assert.assertEquals
@@ -46,6 +47,7 @@ class BleLocatorPhysicalInstrumentedTest {
             val liveState = vm.state.value
             val event = liveState.history.firstOrNull { it.rssiDbm != null }
             assertNotNull("No real BLE RSSI during foreground search", event)
+            assertNotNull("Scan callback sequence missing", event!!.scanSequence)
             val live = BleLocatorMath.evaluate(liveState.history, event!!.address, true,
                 liveState.sessionStartedAtMillis, SystemClock.elapsedRealtimeNanos())
             assertEquals(BleLocatorMath.Status.LIVE, live.status)
@@ -56,6 +58,10 @@ class BleLocatorPhysicalInstrumentedTest {
             val ended = BleLocatorMath.evaluate(vm.state.value.history, event.address, false,
                 null, SystemClock.elapsedRealtimeNanos())
             assertEquals(BleLocatorMath.Status.ENDED, ended.status)
+            val evidence = BleSignalAnalysis.summarize(vm.state.value.history, event.address)
+            Log.i("AtlasLocatorValidation", "session_samples=${evidence.sessionSamples}, target_samples=${evidence.targetSamples}, " +
+                "paired=${evidence.pairedSamples}, missing_orientation=${evidence.missingOrientation}, " +
+                "retained_sequence_gaps_at_least=${evidence.sequenceGapsAtLeast}; no device identifier logged")
             Log.i("AtlasLocatorValidation", "live_then_stopped: rssi_dbm=${live.latestDbm}, samples=${live.sampleCount}; no device identifier logged")
         } finally {
             vm.stop("Physical locator test cleanup")

@@ -3,6 +3,7 @@ package com.example.atlas.permissions
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.content.ContextCompat
 import com.example.atlas.model.PermissionState
 import com.example.atlas.model.RadioType
@@ -15,6 +16,10 @@ class RadioPermissionManager(private val context: Context) {
     fun missingForWifiSurvey(): List<String> = wifiSurveyPermissions.filter {
         ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
     }
+    fun missingForLocalNetwork(): List<String> =
+        if (Build.VERSION.SDK_INT >= 37 &&
+            ContextCompat.checkSelfPermission(context, ACCESS_LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED)
+            listOf(ACCESS_LOCAL_NETWORK) else emptyList()
     fun missingForBleScan(): List<String> = bleScanPermissions.filter {
         ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
     }
@@ -29,6 +34,7 @@ class RadioPermissionManager(private val context: Context) {
     )
 
     companion object {
+        const val ACCESS_LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"
         val cellularPermissions = listOf(Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
         val wifiSurveyPermissions = listOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)

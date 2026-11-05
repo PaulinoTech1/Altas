@@ -41,5 +41,10 @@ class BleSignalLocatorUiTest {
         compose.runOnIdle { assertEquals(1, starts) }
         compose.onNodeWithText("Stop BLE search").performClick()
         compose.runOnIdle { assertEquals(1, stops) }
+        compose.onNodeWithText("Start guided 20s sweep").performClick()
+        compose.runOnIdle { assertEquals(2, starts) }
+        compose.onNodeWithText("Sweep in progress", substring = true).assertExists()
+        compose.onNodeWithText("Stop BLE search").performClick()
+        compose.onNodeWithText("Inconclusive coverage", substring = true).assertExists()
     }
 }

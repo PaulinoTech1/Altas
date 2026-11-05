@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import com.example.atlas.acquisition.bluetooth.BleObservation
+import com.example.atlas.acquisition.bluetooth.BleSignalAnalysis
 import com.example.atlas.ui.TimeFormats
 import kotlin.math.PI
 import kotlin.math.roundToInt
@@ -76,6 +77,7 @@ fun BleOrientationGlobe(
     val chosen = candidates.firstOrNull { it.eventId == selectedEventId } ?: candidates.firstOrNull()
     val chosenIndex = candidates.indexOfFirst { it.eventId == chosen?.eventId }
     val colors = MaterialTheme.colorScheme
+    val analysis = remember(history, activeAddress) { BleSignalAnalysis.summarize(history, activeAddress) }
     val dark = colors.surface.luminance() < 0.5f
     val axes = listOf(AxisGuide("X", 1f, 0f, 0f, colors.error),
         AxisGuide("Y", 0f, 1f, 0f, colors.tertiary), AxisGuide("Z", 0f, 0f, 1f, colors.primary))
@@ -166,6 +168,14 @@ fun BleOrientationGlobe(
                 drawText(end, topLeft = Offset((positive.x + 4f).coerceIn(0f, (size.width - end.size.width).coerceAtLeast(0f)),
                     labelY.coerceIn(0f, (size.height - end.size.height).coerceAtLeast(0f))))
             }
+            // Rings summarize repeated handset orientations; a single packet never creates a sector.
+            if (activeAddress != null) for (sector in analysis.comparableSectors) {
+                val point = OrientationGlobeMath.projectReference(sector.x, sector.y, sector.z,
+                    sector.medianDbm, yaw, pitch, zoom)
+                val position = Offset(center.x + point.x * radius, center.y + point.y * radius)
+                drawCircle(colors.primary.copy(alpha = 0.65f), 12f + minOf(sector.count, 12),
+                    position, style = Stroke(2.5f))
+            }
             for (point in visiblePoints.sortedBy { it.depth }) {
                 val event = point.event
                 val position = Offset(center.x + point.x * radius, center.y + point.y * radius)
@@ -181,6 +191,22 @@ fun BleOrientationGlobe(
             style = MaterialTheme.typography.bodySmall)
         Text("X, Y, Z are phone-orientation axes. Each colored axis has ticks at -50, -70, -90, -100 dBm; numbers on X label the shared scale. Stronger signal is toward center. Axes and shells are not device coordinates or range.",
             style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        if (activeAddress != null) {
+            Text("Signal evidence: ${analysis.pairedSamples}/${analysis.targetSamples} address readings paired with phone orientation; " +
+                "${analysis.missingRssi} missing RSSI, ${analysis.missingOrientation} missing orientation, " +
+                "${analysis.missingSourceTime} missing RF timestamp. " +
+                "At least ${analysis.sequenceGapsAtLeast} callback-order gaps in retained session data.",
+                style = MaterialTheme.typography.bodySmall)
+            Text("${analysis.comparableSectors.size} repeated orientation sectors (3+ samples, median spread 8 dB or less). " +
+                if (analysis.repeatableCoverage) "Compare sectors cautiously; repeat a sweep before drawing conclusions."
+                else "Coverage is insufficient for a sweep comparison.",
+                style = MaterialTheme.typography.bodySmall)
+            analysis.comparableSectors.take(4).forEach { sector ->
+                Text("Phone orientation sector ${sector.azimuthBin + 1}/${sector.elevationBin + 1}: " +
+                    "${sector.count} samples, median ${sector.medianDbm} dBm, spread ${sector.spreadDb} dB.",
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        }
         if (selectedAddress != null && activeAddress == null && samples.isNotEmpty()) {
             Text("The selected address has no paired sample in this scan; showing all observed addresses.",
                 style = MaterialTheme.typography.bodySmall)

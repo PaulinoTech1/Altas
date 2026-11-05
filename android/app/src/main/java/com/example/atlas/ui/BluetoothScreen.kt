@@ -239,6 +239,11 @@ private fun DeviceRow(device: BleDeviceHistory, spark: List<Int>, expanded: Bool
                 Text("Advertised services: ${event.advertisement.serviceUuids.joinToString().ifEmpty { "None reported" }}")
                 event.advertisement.manufacturerData.forEach { Text("Manufacturer 0x${it.companyId.toString(16).padStart(4, '0')}: ${it.payloadHex}") }
                 Text("Advertised Tx power: ${event.advertisement.txPowerDbm?.let { "$it dBm" } ?: "Not reported"}")
+                Text("Scan-result Tx power: ${event.resultTxPowerDbm?.let { "$it dBm" } ?: "Not reported"}; " +
+                    "primary PHY code: ${event.primaryPhy ?: "unavailable"}; advertising SID: ${event.advertisingSid ?: "unavailable"}")
+                Text("Phone orientation: ${event.phoneOrientation?.let { orientation ->
+                    event.sourceElapsedNanos?.let { source -> "paired ${((source - orientation.elapsedNanos) / 1_000_000).coerceAtLeast(0)} ms before RF timestamp" }
+                } ?: "unpaired"}; callback ordinal: ${event.scanSequence ?: "unavailable"}")
                 if (event.advertisement.malformed) Text("Malformed or incomplete AD field detected.")
                 if (event.advertisement.truncated) Text("Advertisement truncated by source or size cap.")
                 Text("Raw advertisement: ${event.advertisement.rawHex.ifEmpty { "Not supplied" }}", style = MaterialTheme.typography.bodySmall)

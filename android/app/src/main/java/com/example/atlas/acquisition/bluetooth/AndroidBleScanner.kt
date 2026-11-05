@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 class AndroidBleScanner(context: Context, private val permissions: RadioPermissionManager) : BleScanner {
     private val app = context.applicationContext
@@ -41,6 +42,7 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
         check(adapter?.isEnabled == true) { "Bluetooth is disabled or unavailable. Enable it manually." }
         val scanner: BluetoothLeScanner = checkNotNull(adapter.bluetoothLeScanner) { "BLE scanner is unavailable." }
         val scanSessionId = UUID.randomUUID().toString()
+        val scanSequence = AtomicLong()
         val sensors = app.getSystemService(SensorManager::class.java)
         val orientationSensor = sensors?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
         // Sensor events and BLE callbacks may arrive on different threads or in different orders.
@@ -67,6 +69,7 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
                     val received = SystemClock.elapsedRealtimeNanos()
                     val source = result.timestampNanos.takeIf { it in 1..received }
                     val orientation = source?.let(orientations::atOrBefore)
+                    val sequence = scanSequence.incrementAndGet()
                     val event = BleObservation(
                         UUID.randomUUID().toString(), result.device.address,
                         System.currentTimeMillis(), received, source,
@@ -74,7 +77,11 @@ class AndroidBleScanner(context: Context, private val permissions: RadioPermissi
                         AdvertisementParser.parse(result.scanRecord?.bytes,
                             result.dataStatus == ScanResult.DATA_TRUNCATED),
                         phoneOrientation = orientation,
-                        orientationSessionId = scanSessionId
+                        orientationSessionId = scanSessionId,
+                        scanSequence = sequence,
+                        resultTxPowerDbm = result.txPower.takeUnless { it == ScanResult.TX_POWER_NOT_PRESENT },
+                        primaryPhy = result.primaryPhy,
+                        advertisingSid = result.advertisingSid.takeUnless { it == ScanResult.SID_NOT_PRESENT }
                     )
                     trySend(event)
                 } catch (_: SecurityException) {

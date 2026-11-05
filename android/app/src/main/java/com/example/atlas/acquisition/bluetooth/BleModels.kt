@@ -37,7 +37,12 @@ data class BleObservation(
     val advertisement: Advertisement,
     val sourceApi: String = "BluetoothLeScanner / ScanResult",
     val phoneOrientation: PhoneOrientation? = null,
-    val orientationSessionId: String? = null
+    val orientationSessionId: String? = null,
+    /** Callback order within this scan; gaps in retained observations reveal lost samples. */
+    val scanSequence: Long? = null,
+    val resultTxPowerDbm: Int? = null,
+    val primaryPhy: Int? = null,
+    val advertisingSid: Int? = null
 ) {
     fun ageMillis(nowElapsedNanos: Long): Long? = sourceElapsedNanos?.takeIf { it <= nowElapsedNanos }?.let {
         (nowElapsedNanos - it) / 1_000_000
