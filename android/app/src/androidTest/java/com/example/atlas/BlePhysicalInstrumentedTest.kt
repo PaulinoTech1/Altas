@@ -1,5 +1,7 @@
 package com.example.atlas
 
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.location.LocationManager
 import android.os.SystemClock
 import android.util.Log
@@ -18,6 +20,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.example.atlas.acquisition.bluetooth.BluetoothViewModel
+import com.example.atlas.acquisition.bluetooth.BleSignalAnalysis
 import com.example.atlas.permissions.RadioPermissionManager
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -53,7 +56,27 @@ class BlePhysicalInstrumentedTest {
         val appleManufacturer = result.history.count { event ->
             event.advertisement.manufacturerData.any { it.companyId == 0x004C }
         }
-        Log.i("AtlasBleValidation", "airpods_probe: observations=${result.receivedCount}, addresses=${result.devices.size}, airpods_named=$namedAirPods, apple_manufacturer=$appleManufacturer; no GATT connection or identifiers logged")
+        val appleAddresses = result.history.filter { event ->
+            event.advertisement.manufacturerData.any { it.companyId == 0x004C }
+        }.map { it.address }.distinct()
+        val appleEvidence = appleAddresses.map { BleSignalAnalysis.summarize(result.history, it) }
+        val adapter = app.getSystemService(BluetoothManager::class.java).adapter
+        @Suppress("DEPRECATION")
+        val audioProfileConnected = adapter.let { adapter ->
+            adapter.getProfileConnectionState(BluetoothProfile.A2DP) == BluetoothProfile.STATE_CONNECTED ||
+                adapter.getProfileConnectionState(BluetoothProfile.HEADSET) == BluetoothProfile.STATE_CONNECTED
+        }
+        val namedBonds = adapter.bondedDevices.filter { it.name?.contains("AirPods", ignoreCase = true) == true }
+        val observedAddresses = result.history.map { it.address }.toSet()
+        val bondObserved = namedBonds.count { it.address in observedAddresses }
+        val bondAppleObserved = namedBonds.count { it.address in appleAddresses }
+        Log.i("AtlasBleValidation", "airpods_probe: observations=${result.receivedCount}, addresses=${result.devices.size}, " +
+            "airpods_named=$namedAirPods, apple_manufacturer=$appleManufacturer, apple_addresses=${appleAddresses.size}, " +
+            "apple_max_paired=${appleEvidence.maxOfOrNull { it.pairedSamples } ?: 0}, " +
+            "apple_max_comparable_sectors=${appleEvidence.maxOfOrNull { it.comparableSectors.size } ?: 0}, " +
+            "audio_profile_connected=$audioProfileConnected, named_airpods_bonds=${namedBonds.size}, " +
+            "bond_addresses_observed=$bondObserved, bond_addresses_with_apple_code=$bondAppleObserved; " +
+            "no GATT connection or identifiers logged")
         assertNull("Passive probe must never auto-connect", vm.gatt.state.value.address)
     }
 
